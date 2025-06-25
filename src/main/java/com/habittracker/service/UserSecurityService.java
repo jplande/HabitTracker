@@ -4,6 +4,7 @@ import com.habittracker.security.CustomUserDetailsService.UserPrincipal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -35,12 +36,23 @@ public class UserSecurityService {
     }
 
     private boolean isOwner(Long userId, Authentication authentication) {
-        try {
-            UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-            return userId.equals(principal.getId());
-        } catch (ClassCastException e) {
-            log.warn("Type de principal inattendu: {}", authentication.getPrincipal().getClass());
-            return false;
+        // Pour JWT
+        if (authentication.getPrincipal() instanceof Jwt jwt) {
+            try {
+                Long tokenUserId = jwt.getClaim("userId");
+                return userId.equals(tokenUserId);
+            } catch (Exception e) {
+                log.warn("Erreur lors de l'extraction de userId du JWT: {}", e.getMessage());
+                return false;
+            }
         }
+
+        // Pour UserPrincipal
+        if (authentication.getPrincipal() instanceof UserPrincipal principal) {
+            return userId.equals(principal.getId());
+        }
+
+        log.warn("Type de principal inattendu: {}", authentication.getPrincipal().getClass());
+        return false;
     }
 }
