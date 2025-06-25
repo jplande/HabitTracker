@@ -1,6 +1,6 @@
 
 // LoginRequest.java
-package com.habittracker.dto;
+package com.habittracker.dto.auth;
 
 import lombok.Builder;
 import lombok.Value;

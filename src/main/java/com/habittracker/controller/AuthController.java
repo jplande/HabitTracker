@@ -1,6 +1,10 @@
 package com.habittracker.controller;
 
 import com.habittracker.dto.*;
+import com.habittracker.dto.auth.AuthResponse;
+import com.habittracker.dto.auth.LoginRequest;
+import com.habittracker.dto.auth.RefreshTokenRequest;
+import com.habittracker.dto.user.UserInfoResponse;
 import com.habittracker.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

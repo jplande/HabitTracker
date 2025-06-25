@@ -1,8 +1,8 @@
 package com.habittracker.service;
 
-import com.habittracker.dto.UserCreateRequest;
-import com.habittracker.dto.UserResponse;
-import com.habittracker.dto.UserUpdateRequest;
+import com.habittracker.dto.user.UserCreateRequest;
+import com.habittracker.dto.user.UserResponse;
+import com.habittracker.dto.user.UserUpdateRequest;
 import com.habittracker.entity.User;
 import com.habittracker.exception.BusinessException;
 import com.habittracker.exception.ResourceNotFoundException;

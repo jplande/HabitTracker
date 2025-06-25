@@ -1,7 +1,7 @@
 package com.habittracker.controller;
 
-import com.habittracker.dto.UserResponse;
-import com.habittracker.dto.UserUpdateRequest;
+import com.habittracker.dto.user.UserResponse;
+import com.habittracker.dto.user.UserUpdateRequest;
 import com.habittracker.service.UserSecurityService;
 import com.habittracker.service.UserService;
 import lombok.RequiredArgsConstructor;

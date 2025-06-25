@@ -1,4 +1,4 @@
-package com.habittracker.dto;
+package com.habittracker.dto.auth;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;

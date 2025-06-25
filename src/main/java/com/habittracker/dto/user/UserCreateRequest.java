@@ -1,4 +1,4 @@
-package com.habittracker.dto;
+package com.habittracker.dto.user;
 
 import lombok.Builder;
 import lombok.Value;

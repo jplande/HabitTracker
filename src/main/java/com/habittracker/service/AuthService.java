@@ -1,10 +1,10 @@
 package com.habittracker.service;
 
 import com.habittracker.config.JwtConfig;
-import com.habittracker.dto.AuthResponse;
-import com.habittracker.dto.LoginRequest;
+import com.habittracker.dto.auth.AuthResponse;
+import com.habittracker.dto.auth.LoginRequest;
 import com.habittracker.dto.RegisterRequest;
-import com.habittracker.dto.UserInfoResponse;
+import com.habittracker.dto.user.UserInfoResponse;
 import com.habittracker.entity.User;
 import com.habittracker.exception.BusinessException;
 import com.habittracker.repository.UserRepository;
