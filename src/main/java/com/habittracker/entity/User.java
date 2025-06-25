@@ -55,7 +55,6 @@ public class User {
         USER, ADMIN
     }
 
-    // Constructeur utile
     public User(String username, String email, String password) {
         this.username = username;
         this.email = email;

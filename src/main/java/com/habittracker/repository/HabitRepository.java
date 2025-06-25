@@ -23,4 +23,6 @@ public interface HabitRepository extends JpaRepository<Habit, Long> {
 
     long countByUserIdAndIsActive(Long userId, Boolean isActive);
     long countByUserIdAndCategory(Long userId, Habit.Category category);
+
+    Long countByUserId(Long userId);
 }
