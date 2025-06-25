@@ -75,6 +75,9 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**", "/api-docs/**").permitAll()
                         .requestMatchers("/error").permitAll()
 
+                        // Endpoints de test
+                        .requestMatchers("/test/**").permitAll()
+
                         // Endpoints d'authentification
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers("/api/auth/refresh").permitAll()
