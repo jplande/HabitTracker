@@ -53,7 +53,7 @@ public class CachedServices {
      */
     public Map<String, Object> getChartData(Long habitId, int days, String chartType) {
         // Vérifier le cache
-        Optional<Map> cached = cacheService.getChartData(habitId, chartType);
+        Optional<Map<String, Object>> cached = cacheService.getChartData(habitId, chartType);
         if (cached.isPresent()) {
             log.debug("🎯 Chart data cache hit: {}/{}", habitId, chartType);
             return cached.get();
