@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -25,7 +24,7 @@ public class JwtService {
     private final JwtDecoder jwtDecoder;
     private final JwtConfig jwtConfig;
 
-    // Cache simple pour les refresh tokens (en production : utiliser Redis)
+    // Cache simple pour les refresh tokens
     private final Set<String> validRefreshTokens = ConcurrentHashMap.newKeySet();
 
     public String generateAccessToken(Authentication authentication) {
@@ -38,22 +37,38 @@ public class JwtService {
         return refreshToken;
     }
 
+    /**
+     * ✅ MÉTHODE PRINCIPALE FIXÉE pour génération token User
+     */
     public String generateAccessToken(User user) {
         Instant now = Instant.now();
         Instant expiry = now.plus(jwtConfig.getAccessTokenExpiration(), ChronoUnit.SECONDS);
 
+        // ✅ Claims standardisées et compatibles
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer("habit-tracker")
                 .issuedAt(now)
                 .expiresAt(expiry)
                 .subject(user.getUsername())
+
+                // Claims custom
                 .claim("userId", user.getId())
                 .claim("email", user.getEmail())
-                .claim("role", "ROLE_" + user.getRole().name())
+                .claim("username", user.getUsername())
+
+                // ✅ FIX: Authorities au bon format
+                .claim("authorities", "ROLE_" + user.getRole().name())
+                .claim("role", user.getRole().name())
+
                 .claim("type", "access")
                 .build();
 
-        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+
+        log.info("🔑 Token généré pour {} (ID: {}, Role: {})",
+                user.getUsername(), user.getId(), user.getRole());
+
+        return token;
     }
 
     public boolean isRefreshTokenValid(String token) {
@@ -71,6 +86,7 @@ public class JwtService {
 
     public void invalidateRefreshToken(String token) {
         validRefreshTokens.remove(token);
+        log.debug("🗑️ Refresh token invalidé");
     }
 
     public String getUsernameFromToken(String token) {
@@ -79,6 +95,19 @@ public class JwtService {
             return jwt.getSubject();
         } catch (Exception e) {
             log.debug("Impossible d'extraire l'username du token: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * ✅ Méthode pour extraire l'userId du token
+     */
+    public Long getUserIdFromToken(String token) {
+        try {
+            Jwt jwt = jwtDecoder.decode(token);
+            return jwt.getClaim("userId");
+        } catch (Exception e) {
+            log.debug("Impossible d'extraire l'userId du token: {}", e.getMessage());
             return null;
         }
     }
@@ -92,25 +121,51 @@ public class JwtService {
                 return false;
             }
         });
+        log.info("🗑️ Tous les tokens de {} invalidés", username);
     }
 
+    /**
+     * ✅ Génération token depuis Authentication (pour compatibility)
+     */
     private String generateToken(Authentication authentication, long expiration, String type) {
         Instant now = Instant.now();
         Instant expiry = now.plus(expiration, ChronoUnit.SECONDS);
 
-        String scope = authentication.getAuthorities().stream()
+        String authorities = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.joining(" "));
+                .collect(Collectors.joining(","));
 
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer("habit-tracker")
                 .issuedAt(now)
                 .expiresAt(expiry)
                 .subject(authentication.getName())
-                .claim("scope", scope)
+
+                // ✅ Authorities au bon format
+                .claim("authorities", authorities)
+                .claim("scope", authorities) // Pour compatibilité
+
                 .claim("type", type)
                 .build();
 
         return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+    }
+
+    /**
+     * ✅ Méthode de debug pour vérifier un token
+     */
+    public void debugToken(String token) {
+        try {
+            Jwt jwt = jwtDecoder.decode(token);
+            log.info("🔍 TOKEN DEBUG:");
+            log.info("  Subject: {}", jwt.getSubject());
+            log.info("  UserId: {}", (Object) jwt.getClaim("userId"));
+            log.info("  Authorities: {}", (Object) jwt.getClaim("authorities"));
+            log.info("  Role: {}", (Object) jwt.getClaim("role"));
+            log.info("  Expires: {}", jwt.getExpiresAt());
+            log.info("  Type: {}", (Object) jwt.getClaim("type"));
+        } catch (Exception e) {
+            log.error(" Token invalide: {}", e.getMessage());
+        }
     }
 }

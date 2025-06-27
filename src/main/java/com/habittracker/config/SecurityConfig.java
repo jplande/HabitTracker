@@ -25,6 +25,11 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
+/**
+ * Configuration de sécurité PROPRE
+ * - Charts habitudes : PUBLICS (pas de données privées)
+ * - Stats utilisateur : PROTÉGÉES (données privées)
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
@@ -59,10 +64,8 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // Middleware de logging
                 .addFilterBefore(loggingMiddleware, UsernamePasswordAuthenticationFilter.class)
 
-                // Configuration OAuth2 Resource Server avec JWT
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter())
@@ -70,25 +73,44 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
-                        // Endpoints publics
+                        // ========== ENDPOINTS PUBLICS ==========
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/swagger-ui/**", "/api-docs/**").permitAll()
                         .requestMatchers("/error").permitAll()
 
-                        // Endpoints de test
-                        .requestMatchers("/test/**").permitAll()
+                        // Tests et debug
+                        .requestMatchers("/api/simple/**").permitAll()
 
-                        // Endpoints d'authentification
+                        // Auth endpoints
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers("/api/auth/refresh").permitAll()
 
-                        // Endpoints admin
+                        // ========== GRAPHIQUES HABITUDES : PUBLICS ==========
+                        // Les graphiques d'habitudes ne contiennent pas de données privées
+                        .requestMatchers("/api/habits/*/charts/**").permitAll()
+                        .requestMatchers("/api/habits/*/statistics").permitAll()
+
+                        // ========== DONNÉES UTILISATEUR : PROTÉGÉES ==========
+                        // Les statistiques, tendances et dashboard contiennent des données privées
+                        .requestMatchers("/api/users/*/statistics").authenticated()
+                        .requestMatchers("/api/users/*/trends").authenticated()
+                        .requestMatchers("/api/users/*/dashboard").authenticated()
+                        .requestMatchers("/api/users/*/habits/comparison").authenticated()
+
+                        // ========== CRUD : PROTÉGÉ ==========
+                        .requestMatchers("/api/habits").authenticated()
+                        .requestMatchers("/api/habits/*").authenticated()
+                        .requestMatchers("/api/progress/**").authenticated()
+                        .requestMatchers("/api/achievements/**").authenticated()
+                        .requestMatchers("/api/users/*").authenticated()
+
+                        // Admin
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                        // Tous les autres endpoints API nécessitent une authentification
+                        // Fallback
                         .requestMatchers("/api/**").authenticated()
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll()
                 )
                 .authenticationProvider(authenticationProvider());
 
@@ -98,11 +120,13 @@ public class SecurityConfig {
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        authoritiesConverter.setAuthorityPrefix("");
-        authoritiesConverter.setAuthoritiesClaimName("scope");
+        authoritiesConverter.setAuthorityPrefix("ROLE_");
+        authoritiesConverter.setAuthoritiesClaimName("authorities");
 
         JwtAuthenticationConverter authenticationConverter = new JwtAuthenticationConverter();
         authenticationConverter.setJwtGrantedAuthoritiesConverter(authoritiesConverter);
+        authenticationConverter.setPrincipalClaimName("sub");
+
         return authenticationConverter;
     }
 
