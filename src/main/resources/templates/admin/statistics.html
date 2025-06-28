@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title th:text="${pageTitle} + ' - HabitTracker Admin'">Statistiques Détaillées - HabitTracker</title>
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    .sidebar {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .stat-card {
+      border-left: 4px solid #007bff;
+      transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    .chart-container {
+      position: relative;
+      height: 300px;
+    }
+    .trend-indicator {
+      font-size: 0.9em;
+    }
+    .trend-up { color: #28a745; }
+    .trend-down { color: #dc3545; }
+    .trend-stable { color: #6c757d; }
+    .metric-card {
+      background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+<div class="container-fluid">
+  <div class="row">
+    <!-- Sidebar -->
+    <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+      <div class="position-sticky pt-3">
+        <div class="text-center text-white mb-4">
+          <h4><i class="fas fa-cogs"></i> Admin Panel</h4>
+          <small sec:authentication="name">Utilisateur connecté</small>
+        </div>
+
+        <ul class="nav flex-column">
+          <li class="nav-item">
+            <a class="nav-link text-white" th:href="@{/admin/dashboard}">
+              <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white" th:href="@{/admin/users}">
+              <i class="fas fa-users"></i> Utilisateurs
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white" th:href="@{/admin/habits}">
+              <i class="fas fa-bullseye"></i> Habitudes
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white active" th:href="@{/admin/statistics}">
+              <i class="fas fa-chart-bar"></i> Statistiques
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white" th:href="@{/admin/settings}">
+              <i class="fas fa-cog"></i> Paramètres
+            </a>
+          </li>
+          <li class="nav-item mt-3">
+            <a class="nav-link text-white" th:href="@{/}">
+              <i class="fas fa-arrow-left"></i> Retour à l'app
+            </a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+      <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2"><i class="fas fa-chart-bar"></i> Statistiques Détaillées</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+          <div class="btn-group me-2">
+            <select class="form-select form-select-sm" id="periodSelect">
+              <option value="7" th:selected="${selectedDays == 7}">7 jours</option>
+              <option value="30" th:selected="${selectedDays == 30}">30 jours</option>
+              <option value="90" th:selected="${selectedDays == 90}">90 jours</option>
+              <option value="365" th:selected="${selectedDays == 365}">1 an</option>
+            </select>
+          </div>
+          <div class="btn-group">
+            <button type="button" class="btn btn-sm btn-outline-secondary">
+              <i class="fas fa-download"></i> PDF
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary">
+              <i class="fas fa-file-excel"></i> Excel
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Métriques principales -->
+      <div class="row mb-4" th:if="${detailedStats}">
+        <div class="col-md-3 mb-3">
+          <div class="metric-card text-center">
+            <i class="fas fa-chart-line fa-2x text-primary mb-2"></i>
+            <h4 th:text="${detailedStats.avgDailyProgress}">0</h4>
+            <p class="text-muted mb-1">Progression Moyenne/Jour</p>
+            <span class="trend-indicator trend-up">
+                                <i class="fas fa-arrow-up"></i> +12%
+                            </span>
+          </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+          <div class="metric-card text-center">
+            <i class="fas fa-user-check fa-2x text-success mb-2"></i>
+            <h4 th:text="${detailedStats.retentionRate} + '%'">0%</h4>
+            <p class="text-muted mb-1">Taux de Rétention</p>
+            <span class="trend-indicator trend-up">
+                                <i class="fas fa-arrow-up"></i> +5%
+                            </span>
+          </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+          <div class="metric-card text-center">
+            <i class="fas fa-clock fa-2x text-warning mb-2"></i>
+            <h4 th:text="${detailedStats.avgSessionTime}">0 min</h4>
+            <p class="text-muted mb-1">Temps de Session Moyen</p>
+            <span class="trend-indicator trend-stable">
+                                <i class="fas fa-minus"></i> Stable
+                            </span>
+          </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+          <div class="metric-card text-center">
+            <i class="fas fa-fire fa-2x text-danger mb-2"></i>
+            <h4 th:text="${detailedStats.dailyActiveUsers}">0</h4>
+            <p class="text-muted mb-1">Utilisateurs Actifs/Jour</p>
+            <span class="trend-indicator trend-up">
+                                <i class="fas fa-arrow-up"></i> +8%
+                            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Graphiques principaux -->
+      <div class="row mb-4">
+        <!-- Évolution temporelle -->
+        <div class="col-md-8">
+          <div class="card">
+            <div class="card-header">
+              <h5><i class="fas fa-chart-area"></i> Évolution de l'Activité</h5>
+            </div>
+            <div class="card-body">
+              <div class="chart-container">
+                <canvas id="timelineChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Funnel d'engagement -->
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-header">
+              <h5><i class="fas fa-funnel-dollar"></i> Funnel d'Engagement</h5>
+            </div>
+            <div class="card-body">
+              <div th:if="${advancedCharts?.engagementFunnel}">
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span>Inscription</span>
+                    <span class="badge bg-primary" th:text="${advancedCharts.engagementFunnel.registration} + '%'">100%</span>
+                  </div>
+                  <div class="progress mt-1" style="height: 10px;">
+                    <div class="progress-bar bg-primary" style="width: 100%"></div>
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span>Première Habitude</span>
+                    <span class="badge bg-success" th:text="${advancedCharts.engagementFunnel.firstHabit} + '%'">75%</span>
+                  </div>
+                  <div class="progress mt-1" style="height: 10px;">
+                    <div class="progress-bar bg-success" th:style="'width: ' + ${advancedCharts.engagementFunnel.firstHabit} + '%'"></div>
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span>Actif Hebdomadaire</span>
+                    <span class="badge bg-warning" th:text="${advancedCharts.engagementFunnel.weeklyActive} + '%'">45%</span>
+                  </div>
+                  <div class="progress mt-1" style="height: 10px;">
+                    <div class="progress-bar bg-warning" th:style="'width: ' + ${advancedCharts.engagementFunnel.weeklyActive} + '%'"></div>
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span>Actif Mensuel</span>
+                    <span class="badge bg-danger" th:text="${advancedCharts.engagementFunnel.monthlyActive} + '%'">32%</span>
+                  </div>
+                  <div class="progress mt-1" style="height: 10px;">
+                    <div class="progress-bar bg-danger" th:style="'width: ' + ${advancedCharts.engagementFunnel.monthlyActive} + '%'"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tendances détaillées - SECTION CORRIGÉE -->
+      <div class="row mb-4" th:if="${trends}">
+        <div class="col-md-12">
+          <div class="card">
+            <div class="card-header">
+              <h5><i class="fas fa-trending-up"></i> Analyse des Tendances</h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <!-- Croissance Utilisateurs -->
+                <div class="col-md-4 text-center">
+                  <div class="card border-0 bg-light">
+                    <div class="card-body">
+                      <div th:switch="${trends.userGrowthTrend}">
+                        <i th:case="'positive'" class="fas fa-users fa-2x mb-2 text-success"></i>
+                        <i th:case="'negative'" class="fas fa-users fa-2x mb-2 text-danger"></i>
+                        <i th:case="*" class="fas fa-users fa-2x mb-2 text-warning"></i>
+                      </div>
+                      <h6>Croissance Utilisateurs</h6>
+                      <div th:switch="${trends.userGrowthTrend}">
+                        <span th:case="'positive'" class="badge bg-success" th:text="${trends.userGrowthTrend}">positive</span>
+                        <span th:case="'negative'" class="badge bg-danger" th:text="${trends.userGrowthTrend}">negative</span>
+                        <span th:case="*" class="badge bg-warning" th:text="${trends.userGrowthTrend}">stable</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Tendance Activité -->
+                <div class="col-md-4 text-center">
+                  <div class="card border-0 bg-light">
+                    <div class="card-body">
+                      <div th:switch="${trends.activityTrend}">
+                        <i th:case="'positive'" class="fas fa-chart-line fa-2x mb-2 text-success"></i>
+                        <i th:case="'negative'" class="fas fa-chart-line fa-2x mb-2 text-danger"></i>
+                        <i th:case="*" class="fas fa-chart-line fa-2x mb-2 text-warning"></i>
+                      </div>
+                      <h6>Tendance Activité</h6>
+                      <div th:switch="${trends.activityTrend}">
+                        <span th:case="'positive'" class="badge bg-success" th:text="${trends.activityTrend}">positive</span>
+                        <span th:case="'negative'" class="badge bg-danger" th:text="${trends.activityTrend}">negative</span>
+                        <span th:case="*" class="badge bg-warning" th:text="${trends.activityTrend}">stable</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Engagement Utilisateur -->
+                <div class="col-md-4 text-center">
+                  <div class="card border-0 bg-light">
+                    <div class="card-body">
+                      <div th:switch="${trends.engagementTrend}">
+                        <i th:case="'positive'" class="fas fa-heart fa-2x mb-2 text-success"></i>
+                        <i th:case="'negative'" class="fas fa-heart fa-2x mb-2 text-danger"></i>
+                        <i th:case="*" class="fas fa-heart fa-2x mb-2 text-warning"></i>
+                      </div>
+                      <h6>Engagement Utilisateur</h6>
+                      <div th:switch="${trends.engagementTrend}">
+                        <span th:case="'positive'" class="badge bg-success" th:text="${trends.engagementTrend}">positive</span>
+                        <span th:case="'negative'" class="badge bg-danger" th:text="${trends.engagementTrend}">negative</span>
+                        <span th:case="*" class="badge bg-warning" th:text="${trends.engagementTrend}">positive</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Heatmap d'activité -->
+      <div class="row">
+        <div class="col-md-12">
+          <div class="card">
+            <div class="card-header">
+              <h5><i class="fas fa-calendar-alt"></i> Heatmap d'Activité</h5>
+            </div>
+            <div class="card-body">
+              <div class="chart-container" style="height: 200px;">
+                <canvas id="heatmapChart"></canvas>
+              </div>
+              <div class="text-center mt-3">
+                <small class="text-muted">
+                  <i class="fas fa-square text-light"></i> Faible activité
+                  <i class="fas fa-square text-warning ms-2"></i> Activité modérée
+                  <i class="fas fa-square text-success ms-2"></i> Forte activité
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Charts Scripts -->
+<script>
+  // Gestion du changement de période
+  document.getElementById('periodSelect').addEventListener('change', function() {
+    const selectedDays = this.value;
+    window.location.href = `/admin/statistics?days=${selectedDays}`;
+  });
+
+  // Graphique d'évolution temporelle
+  const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+  new Chart(timelineCtx, {
+    type: 'line',
+    data: {
+      labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6'],
+      datasets: [{
+        label: 'Nouveaux utilisateurs',
+        data: [12, 19, 15, 25, 22, 30],
+        borderColor: '#007bff',
+        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+        tension: 0.4,
+        fill: true
+      }, {
+        label: 'Progressions',
+        data: [45, 52, 48, 61, 58, 67],
+        borderColor: '#28a745',
+        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+        mode: 'index'
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top'
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: 'rgba(0,0,0,0.1)'
+          }
+        },
+        x: {
+          grid: {
+            display: false
+          }
+        }
+      }
+    }
+  });
+
+  // Simulation de heatmap (graphique en barres)
+  const heatmapCtx = document.getElementById('heatmapChart').getContext('2d');
+  new Chart(heatmapCtx, {
+    type: 'bar',
+    data: {
+      labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
+      datasets: [{
+        label: 'Activité par jour',
+        data: [85, 92, 78, 88, 95, 65, 45],
+        backgroundColor: function(context) {
+          const value = context.parsed.y;
+          if (value > 80) return '#28a745';
+          if (value > 60) return '#ffc107';
+          return '#dc3545';
+        }
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100,
+          ticks: {
+            callback: function(value) {
+              return value + '%';
+            }
+          }
+        }
+      }
+    }
+  });
+</script>
+</body>
+</html>

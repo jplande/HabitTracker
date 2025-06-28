@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title th:text="${pageTitle} + ' - HabitTracker Admin'">Gestion Habitudes - HabitTracker</title>
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    .sidebar {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .category-badge {
+      font-size: 0.8em;
+      padding: 0.25em 0.6em;
+    }
+    .habit-card {
+      transition: transform 0.2s;
+      border-left: 4px solid #007bff;
+    }
+    .habit-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .chart-container {
+      position: relative;
+      height: 250px;
+    }
+  </style>
+</head>
+<body>
+<div class="container-fluid">
+  <div class="row">
+    <!-- Sidebar -->
+    <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+      <div class="position-sticky pt-3">
+        <div class="text-center text-white mb-4">
+          <h4><i class="fas fa-cogs"></i> Admin Panel</h4>
+          <small sec:authentication="name">Utilisateur connecté</small>
+        </div>
+
+        <ul class="nav flex-column">
+          <li class="nav-item">
+            <a class="nav-link text-white" th:href="@{/admin/dashboard}">
+              <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white" th:href="@{/admin/users}">
+              <i class="fas fa-users"></i> Utilisateurs
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white active" th:href="@{/admin/habits}">
+              <i class="fas fa-bullseye"></i> Habitudes
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white" th:href="@{/admin/statistics}">
+              <i class="fas fa-chart-bar"></i> Statistiques
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-white" th:href="@{/admin/settings}">
+              <i class="fas fa-cog"></i> Paramètres
+            </a>
+          </li>
+          <li class="nav-item mt-3">
+            <a class="nav-link text-white" th:href="@{/}">
+              <i class="fas fa-arrow-left"></i> Retour à l'app
+            </a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+      <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2"><i class="fas fa-bullseye"></i> Gestion des Habitudes</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+          <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary">
+              <i class="fas fa-download"></i> Export
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary">
+              <i class="fas fa-sync"></i> Actualiser
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Statistiques des habitudes -->
+      <div class="row mb-4" th:if="${habitStats}">
+        <div class="col-md-4">
+          <div class="card text-center">
+            <div class="card-body">
+              <i class="fas fa-bullseye fa-2x text-primary mb-2"></i>
+              <h4 th:text="${habitStats.totalHabits}">0</h4>
+              <p class="text-muted mb-0">Total Habitudes</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card text-center">
+            <div class="card-body">
+              <i class="fas fa-play-circle fa-2x text-success mb-2"></i>
+              <h4 th:text="${habitStats.activeHabits}">0</h4>
+              <p class="text-muted mb-0">Habitudes Actives</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card text-center">
+            <div class="card-body">
+              <i class="fas fa-pause-circle fa-2x text-warning mb-2"></i>
+              <h4 th:text="${habitStats.inactiveHabits}">0</h4>
+              <p class="text-muted mb-0">Habitudes Inactives</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Graphiques et analyses -->
+      <div class="row mb-4">
+        <!-- Répartition par catégorie -->
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h5><i class="fas fa-chart-pie"></i> Répartition par Catégorie</h5>
+            </div>
+            <div class="card-body">
+              <div class="chart-container">
+                <canvas id="categoryChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Habitudes populaires -->
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h5><i class="fas fa-star"></i> Habitudes Populaires</h5>
+            </div>
+            <div class="card-body">
+              <div th:if="${popularHabits}">
+                <div class="mb-3">
+                  <h6 class="text-muted">Plus créée</h6>
+                  <p class="h5 text-primary" th:text="${popularHabits.mostCreated}">Course à pied</p>
+                </div>
+                <div class="mb-3">
+                  <h6 class="text-muted">Plus de progressions</h6>
+                  <p class="h5 text-success" th:text="${popularHabits.mostProgressed}">Lecture quotidienne</p>
+                </div>
+                <div class="mb-3">
+                  <h6 class="text-muted">Meilleur taux de completion</h6>
+                  <p class="h5 text-info" th:text="${popularHabits.bestCompletion}">Boire de l'eau</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Liste détaillée par catégorie -->
+      <div class="row" th:if="${habitsByCategory}">
+        <div class="col-md-12">
+          <div class="card">
+            <div class="card-header">
+              <h5><i class="fas fa-list"></i> Détail par Catégorie</h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-4 mb-3" th:each="category : ${habitsByCategory}">
+                  <div class="habit-card card h-100">
+                    <div class="card-body text-center">
+                      <!-- Icônes par catégorie -->
+                      <div th:switch="${category.key}">
+                        <i th:case="'SPORT'" class="fas fa-running fa-2x text-danger mb-2"></i>
+                        <i th:case="'SANTE'" class="fas fa-heart fa-2x text-success mb-2"></i>
+                        <i th:case="'EDUCATION'" class="fas fa-book fa-2x text-primary mb-2"></i>
+                        <i th:case="'TRAVAIL'" class="fas fa-briefcase fa-2x text-warning mb-2"></i>
+                        <i th:case="'LIFESTYLE'" class="fas fa-home fa-2x text-info mb-2"></i>
+                        <i th:case="*" class="fas fa-star fa-2x text-secondary mb-2"></i>
+                      </div>
+                      <h4 th:text="${category.value}">0</h4>
+                      <p class="text-muted mb-0" th:text="${category.key}">CATEGORIE</p>
+
+                      <!-- Badge avec pourcentage -->
+                      <span class="badge bg-light text-dark category-badge mt-2"
+                            th:text="${#numbers.formatDecimal((category.value / 183.0) * 100, 1, 1)} + '%'">0%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tendances et insights -->
+      <div class="row mt-4">
+        <div class="col-md-12">
+          <div class="card">
+            <div class="card-header">
+              <h5><i class="fas fa-lightbulb"></i> Insights & Tendances</h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-3 text-center">
+                  <i class="fas fa-trophy fa-2x text-warning mb-2"></i>
+                  <h6>Catégorie Leader</h6>
+                  <p class="text-muted">Sport & Fitness</p>
+                </div>
+                <div class="col-md-3 text-center">
+                  <i class="fas fa-chart-line fa-2x text-success mb-2"></i>
+                  <h6>Croissance</h6>
+                  <p class="text-muted">+15% ce mois</p>
+                </div>
+                <div class="col-md-3 text-center">
+                  <i class="fas fa-clock fa-2x text-info mb-2"></i>
+                  <h6>Fréquence Populaire</h6>
+                  <p class="text-muted">Quotidienne (78%)</p>
+                </div>
+                <div class="col-md-3 text-center">
+                  <i class="fas fa-users fa-2x text-primary mb-2"></i>
+                  <h6>Utilisateurs Actifs</h6>
+                  <p class="text-muted">85% ont ≥1 habitude</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Charts -->
+<script th:if="${habitsByCategory}">
+  // Graphique en camembert pour les catégories
+  const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+
+  // Préparer les données depuis Thymeleaf
+  const categoryData = {
+    /*[[${habitsByCategory}]]*/
+    'SPORT': 45,
+    'SANTE': 38,
+    'EDUCATION': 32,
+    'TRAVAIL': 28,
+    'LIFESTYLE': 25,
+    'AUTRE': 15
+  };
+
+  const labels = Object.keys(categoryData);
+  const data = Object.values(categoryData);
+
+  new Chart(categoryCtx, {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        backgroundColor: [
+          '#dc3545', // SPORT - Rouge
+          '#28a745', // SANTE - Vert
+          '#007bff', // EDUCATION - Bleu
+          '#ffc107', // TRAVAIL - Jaune
+          '#17a2b8', // LIFESTYLE - Cyan
+          '#6c757d'  // AUTRE - Gris
+        ],
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            padding: 20,
+            usePointStyle: true
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              const percentage = ((context.raw / total) * 100).toFixed(1);
+              return context.label + ': ' + context.raw + ' (' + percentage + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connexion Admin - HabitTracker</title>
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-card {
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      width: 100%;
+      max-width: 400px;
+    }
+    .login-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 2rem;
+      text-align: center;
+    }
+    .login-body {
+      padding: 2rem;
+    }
+    .form-control:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    .btn-admin {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      color: white;
+      padding: 12px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+    .btn-admin:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+      color: white;
+    }
+    .alert {
+      border-radius: 10px;
+      border: none;
+    }
+    .form-floating {
+      margin-bottom: 1rem;
+    }
+    .back-link {
+      color: #667eea;
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    .back-link:hover {
+      color: #764ba2;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+      <div class="login-card">
+        <!-- Header -->
+        <div class="login-header">
+          <i class="fas fa-cogs fa-3x mb-3"></i>
+          <h3 class="mb-0">Administration</h3>
+          <p class="mb-0 opacity-75">HabitTracker</p>
+        </div>
+
+        <!-- Body -->
+        <div class="login-body">
+          <!-- Messages d'erreur/succès -->
+          <div th:if="${error}" class="alert alert-danger" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <span th:text="${error}">Erreur de connexion</span>
+          </div>
+
+          <div th:if="${message}" class="alert alert-success" role="alert">
+            <i class="fas fa-check-circle me-2"></i>
+            <span th:text="${message}">Message de succès</span>
+          </div>
+
+          <!-- Formulaire de connexion -->
+          <form method="post" th:action="@{/admin/login}">
+            <div class="form-floating">
+              <input type="text"
+                     class="form-control"
+                     id="username"
+                     name="username"
+                     placeholder="Nom d'utilisateur"
+                     required
+                     autofocus>
+              <label for="username">
+                <i class="fas fa-user me-2"></i>Nom d'utilisateur
+              </label>
+            </div>
+
+            <div class="form-floating">
+              <input type="password"
+                     class="form-control"
+                     id="password"
+                     name="password"
+                     placeholder="Mot de passe"
+                     required>
+              <label for="password">
+                <i class="fas fa-lock me-2"></i>Mot de passe
+              </label>
+            </div>
+
+            <div class="d-grid">
+              <button type="submit" class="btn btn-admin btn-lg">
+                <i class="fas fa-sign-in-alt me-2"></i>
+                Se connecter
+              </button>
+            </div>
+
+            <!-- Token CSRF (ajouté automatiquement par Spring Security) -->
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+          </form>
+
+          <!-- Liens utiles -->
+          <div class="text-center mt-4">
+            <a href="/" class="back-link">
+              <i class="fas fa-arrow-left me-1"></i>
+              Retour à l'application
+            </a>
+          </div>
+
+          <!-- Informations de test (à supprimer en production) -->
+          <div class="mt-4 p-3 bg-light rounded">
+            <small class="text-muted">
+              <strong>🔧 Mode Test :</strong><br>
+              Utilisateur : <code>admin</code><br>
+              Mot de passe : <code>admin123</code>
+            </small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="text-center mt-3">
+        <small class="text-white opacity-75">
+          © 2024 HabitTracker - Interface d'Administration
+        </small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  // Auto-focus sur le champ username si vide
+  window.addEventListener('load', function() {
+    const usernameField = document.getElementById('username');
+    if (usernameField && !usernameField.value) {
+      usernameField.focus();
+    }
+  });
+
+  // Animation au submit
+  document.querySelector('form').addEventListener('submit', function() {
+    const submitBtn = document.querySelector('button[type="submit"]');
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Connexion...';
+    submitBtn.disabled = true;
+  });
+</script>
+</body>
+</html>

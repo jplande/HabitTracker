@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle} + ' - HabitTracker Admin'">Dashboard Admin - HabitTracker</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        .sidebar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .stat-card {
+            border-left: 4px solid #007bff;
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+            <div class="position-sticky pt-3">
+                <div class="text-center text-white mb-4">
+                    <h4><i class="fas fa-cogs"></i> Admin Panel</h4>
+                    <small sec:authentication="name">Utilisateur connecté</small>
+                </div>
+
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link text-white active" th:classappend="${currentPage == 'dashboard'} ? 'active' : ''"
+                           th:href="@{/admin/dashboard}">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white" th:classappend="${currentPage == 'users'} ? 'active' : ''"
+                           th:href="@{/admin/users}">
+                            <i class="fas fa-users"></i> Utilisateurs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white" th:classappend="${currentPage == 'habits'} ? 'active' : ''"
+                           th:href="@{/admin/habits}">
+                            <i class="fas fa-bullseye"></i> Habitudes
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white" th:classappend="${currentPage == 'statistics'} ? 'active' : ''"
+                           th:href="@{/admin/statistics}">
+                            <i class="fas fa-chart-bar"></i> Statistiques
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white" th:href="@{/admin/settings}">
+                            <i class="fas fa-cog"></i> Paramètres
+                        </a>
+                    </li>
+                    <li class="nav-item mt-3">
+                        <a class="nav-link text-white" th:href="@{/}">
+                            <i class="fas fa-arrow-left"></i> Retour à l'app
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2"><i class="fas fa-tachometer-alt"></i> Dashboard Administration</h1>
+                <div class="btn-toolbar mb-2 mb-md-0">
+                    <div class="btn-group me-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-sync"></i> Actualiser
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alertes d'erreur -->
+            <div th:if="${error}" class="alert alert-danger" role="alert">
+                <i class="fas fa-exclamation-triangle"></i> <span th:text="${error}">Erreur</span>
+            </div>
+
+            <!-- Statistiques globales -->
+            <div class="row mb-4" th:if="${globalStats}">
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-users fa-2x text-primary mb-2"></i>
+                            <h4 class="card-title" th:text="${globalStats.totalUsers}">0</h4>
+                            <p class="card-text text-muted">Utilisateurs Total</p>
+                            <small class="text-success" th:text="${globalStats.activeUserRate} + '%'">0%</small>
+                            <span class="text-muted">actifs</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-bullseye fa-2x text-success mb-2"></i>
+                            <h4 class="card-title" th:text="${globalStats.totalHabits}">0</h4>
+                            <p class="card-text text-muted">Habitudes Créées</p>
+                            <small class="text-info" th:text="${globalStats.avgHabitsPerUser}">0</small>
+                            <span class="text-muted">par utilisateur</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-chart-line fa-2x text-warning mb-2"></i>
+                            <h4 class="card-title" th:text="${globalStats.totalProgress}">0</h4>
+                            <p class="card-text text-muted">Progressions</p>
+                            <small class="text-success">+</small>
+                            <span th:text="${recentStats?.progressThisWeek ?: 0}">0</span>
+                            <span class="text-muted">cette semaine</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-trophy fa-2x text-danger mb-2"></i>
+                            <h4 class="card-title" th:text="${globalStats.totalAchievements}">0</h4>
+                            <p class="card-text text-muted">Badges Débloqués</p>
+                            <small class="text-primary">🏆</small>
+                            <span class="text-muted">achievements</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Graphiques -->
+            <div class="row mb-4" th:if="${chartData}">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-area"></i> Croissance Utilisateurs</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="userGrowthChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-bar"></i> Activité Hebdomadaire</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="weeklyActivityChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activité récente -->
+            <div class="row" th:if="${recentStats}">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-clock"></i> Activité Récente (7 derniers jours)</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 text-center">
+                                    <h3 class="text-primary" th:text="${recentStats.newUsersThisWeek}">0</h3>
+                                    <p class="text-muted">Nouveaux utilisateurs</p>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <h3 class="text-success" th:text="${recentStats.progressThisWeek}">0</h3>
+                                    <p class="text-muted">Progressions ajoutées</p>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <h3 class="text-info" th:text="${recentStats.weeklyGrowth} + '%'">0%</h3>
+                                    <p class="text-muted">Croissance hebdomadaire</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Charts -->
+<script th:if="${chartData}">
+    // Graphique croissance utilisateurs
+    const userGrowthCtx = document.getElementById('userGrowthChart').getContext('2d');
+    new Chart(userGrowthCtx, {
+        type: 'line',
+        data: {
+            labels: /*[[${chartData.userGrowth.labels}]]*/ ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'],
+            datasets: [{
+                label: 'Utilisateurs',
+                data: /*[[${chartData.userGrowth.data}]]*/ [10, 25, 45, 78, 120, 150],
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Graphique activité hebdomadaire
+    const weeklyActivityCtx = document.getElementById('weeklyActivityChart').getContext('2d');
+    new Chart(weeklyActivityCtx, {
+        type: 'bar',
+        data: {
+            labels: /*[[${chartData.weeklyActivity.labels}]]*/ ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
+            datasets: [{
+                label: 'Progressions',
+                data: /*[[${chartData.weeklyActivity.data}]]*/ [120, 150, 180, 170, 160, 140, 100],
+                backgroundColor: [
+                    '#007bff', '#28a745', '#ffc107', '#dc3545',
+                    '#6f42c1', '#20c997', '#fd7e14'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+</body>
+</html>
