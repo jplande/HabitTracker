@@ -1,5 +1,6 @@
 package com.habittracker.service;
 
+import com.habittracker.dto.user.AdminUserUpdateRequest;
 import com.habittracker.dto.user.UserCreateRequest;
 import com.habittracker.dto.user.UserResponse;
 import com.habittracker.dto.user.UserUpdateRequest;
@@ -11,6 +12,7 @@ import com.habittracker.repository.HabitRepository;
 import com.habittracker.repository.ProgressRepository;
 import com.habittracker.repository.UserRepository;
 import com.habittracker.util.ValidationUtils;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -19,6 +21,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -55,22 +59,6 @@ public class UserService {
                         "Utilisateur", "username", username));
 
         return enrichWithStatistics(UserResponse.fromEntity(user));
-    }
-
-    /**
-     * Liste tous les utilisateurs avec pagination
-     */
-    public Page<UserResponse> findAllUsers(Pageable pageable) {
-        return userRepository.findAll(pageable)
-                .map(UserResponse::fromEntity);
-    }
-
-    /**
-     * Liste les utilisateurs actifs
-     */
-    public Page<UserResponse> findActiveUsers(Pageable pageable) {
-        return userRepository.findByIsActive(true, pageable)
-                .map(UserResponse::fromEntity);
     }
 
     /**
@@ -244,5 +232,149 @@ public class UserService {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
             log.info("Mot de passe mis à jour pour: {}", user.getUsername());
         }
+    }
+
+    /**
+     * Recherche d'utilisateurs par nom d'utilisateur ou email
+     */
+    public Page<UserResponse> searchUsers(String search, Pageable pageable) {
+        log.info("🔍 Recherche utilisateurs : '{}'", search);
+
+        Page<User> users = userRepository.findByUsernameContainingIgnoreCase(search, pageable);
+        return users.map(this::convertToResponse);
+    }
+
+    /**
+     * Trouve les utilisateurs actifs
+     */
+    public Page<UserResponse> findActiveUsers(Pageable pageable) {
+        log.info("👥 Recherche utilisateurs actifs");
+
+        Page<User> users = userRepository.findByIsActive(true, pageable);
+        return users.map(this::convertToResponse);
+    }
+
+    /**
+     * Trouve les utilisateurs inactifs
+     */
+    public Page<UserResponse> findInactiveUsers(Pageable pageable) {
+        log.info("👥 Recherche utilisateurs inactifs");
+
+        Page<User> users = userRepository.findByIsActive(false, pageable);
+        return users.map(this::convertToResponse);
+    }
+
+    /**
+     * Trouve tous les utilisateurs (paginé)
+     */
+    public Page<UserResponse> findAllUsers(Pageable pageable) {
+        log.info("👥 Recherche tous les utilisateurs");
+
+        Page<User> users = userRepository.findAll(pageable);
+        return users.map(this::convertToResponse);
+    }
+
+    /**
+     * Bascule le statut actif/inactif d'un utilisateur
+     */
+    public UserResponse toggleUserStatus(Long userId) {
+        log.info("🔄 Basculement statut utilisateur {}", userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Utilisateur non trouvé : " + userId));
+
+        user.setIsActive(!user.getIsActive());
+        user.setUpdatedAt(LocalDateTime.now());
+
+        User savedUser = userRepository.save(user);
+        log.info("✅ Statut utilisateur {} basculé vers : {}", userId, savedUser.getIsActive());
+
+        return convertToResponse(savedUser);
+    }
+
+    /**
+     * Compte total des utilisateurs
+     */
+    public long getTotalUsersCount() {
+        return userRepository.count();
+    }
+
+    /**
+     * Compte des utilisateurs actifs
+     */
+    public long getActiveUsersCount() {
+        return userRepository.countByIsActive(true);
+    }
+
+    /**
+     * Méthode de conversion User -> UserResponse (si elle n'existe pas déjà)
+     */
+    private UserResponse convertToResponse(User user) {
+        return UserResponse.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .role(user.getRole())
+                .isActive(user.getIsActive())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .build();
+    }
+
+    // Ajouter cette méthode dans UserService
+
+    /**
+     * Met à jour un utilisateur par un administrateur
+     * Permet de modifier tous les champs y compris rôle et statut
+     */
+    @Transactional
+    public UserResponse updateUserByAdmin(Long userId, AdminUserUpdateRequest request) {
+        log.info("🔧 Mise à jour utilisateur {} par administrateur", userId);
+
+        // Récupération de l'utilisateur existant
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", userId));
+
+        // Vérification unicité username (sauf si inchangé)
+        if (!user.getUsername().equals(request.getUsername()) &&
+                userRepository.existsByUsername(request.getUsername())) {
+            throw new BusinessException("Ce nom d'utilisateur est déjà utilisé : " + request.getUsername());
+        }
+
+        // Vérification unicité email (sauf si inchangé)
+        if (!user.getEmail().equals(request.getEmail()) &&
+                userRepository.existsByEmail(request.getEmail())) {
+            throw new BusinessException("Cette adresse email est déjà utilisée : " + request.getEmail());
+        }
+
+        // Mise à jour des champs obligatoires
+        user.setUsername(request.getUsername());
+        user.setEmail(request.getEmail());
+
+        // Mise à jour des champs optionnels
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+
+        // Mise à jour du rôle (admin seulement)
+        if (request.getRole() != null) {
+            user.setRole(request.getRole());
+            log.info("👑 Rôle utilisateur {} changé vers : {}", userId, request.getRole());
+        }
+
+        // Mise à jour du statut actif (admin seulement)
+        if (request.getIsActive() != null) {
+            user.setIsActive(request.getIsActive());
+            log.info("🔄 Statut utilisateur {} changé vers : {}", userId, request.getIsActive() ? "actif" : "inactif");
+        }
+
+        user.setUpdatedAt(LocalDateTime.now());
+
+        // Sauvegarde
+        User savedUser = userRepository.save(user);
+        log.info("✅ Utilisateur {} mis à jour avec succès par admin", userId);
+
+        return convertToResponse(savedUser);
     }
 }

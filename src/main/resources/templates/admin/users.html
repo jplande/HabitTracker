@@ -42,7 +42,7 @@
 <body>
 <div class="container-fluid">
   <div class="row">
-    <!-- Sidebar (même que dashboard) -->
+    <!-- Sidebar -->
     <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
       <div class="position-sticky pt-3">
         <div class="text-center text-white mb-4">
@@ -91,14 +91,25 @@
         <h1 class="h2"><i class="fas fa-users"></i> Gestion des Utilisateurs</h1>
         <div class="btn-toolbar mb-2 mb-md-0">
           <div class="btn-group me-2">
-            <button type="button" class="btn btn-sm btn-primary">
-              <i class="fas fa-plus"></i> Nouvel utilisateur
-            </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary">
+            <a th:href="@{/admin/users/export}" class="btn btn-sm btn-outline-secondary">
               <i class="fas fa-download"></i> Export CSV
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="location.reload()">
+              <i class="fas fa-sync"></i> Actualiser
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- Messages d'alerte -->
+      <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle"></i> <span th:text="${success}">Succès</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+
+      <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-triangle"></i> <span th:text="${error}">Erreur</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
       </div>
 
       <!-- Statistiques utilisateurs -->
@@ -139,6 +150,7 @@
             <div class="input-group">
               <input type="text" class="form-control" name="search"
                      th:value="${search}" placeholder="Rechercher un utilisateur...">
+              <input type="hidden" name="status" th:value="${status}">
               <button class="btn btn-outline-secondary" type="submit">
                 <i class="fas fa-search"></i>
               </button>
@@ -147,13 +159,16 @@
         </div>
         <div class="col-md-6">
           <div class="btn-group" role="group">
-            <input type="radio" class="btn-check" name="filter" id="all" checked>
+            <input type="radio" class="btn-check" name="filter" id="all"
+                   th:checked="${status == null or status == 'all'}">
             <label class="btn btn-outline-primary" for="all">Tous</label>
 
-            <input type="radio" class="btn-check" name="filter" id="active">
+            <input type="radio" class="btn-check" name="filter" id="active"
+                   th:checked="${status == 'active'}">
             <label class="btn btn-outline-success" for="active">Actifs</label>
 
-            <input type="radio" class="btn-check" name="filter" id="inactive">
+            <input type="radio" class="btn-check" name="filter" id="inactive"
+                   th:checked="${status == 'inactive'}">
             <label class="btn btn-outline-warning" for="inactive">Inactifs</label>
           </div>
         </div>
@@ -187,8 +202,8 @@
                     <div>
                       <strong th:text="${user.username}">username</strong><br>
                       <small class="text-muted">
-                        <span th:text="${user.firstName}">Prénom</span>
-                        <span th:text="${user.lastName}">Nom</span>
+                        <span th:text="${user.firstName ?: ''}">Prénom</span>
+                        <span th:text="${user.lastName ?: ''}">Nom</span>
                       </small>
                     </div>
                   </div>
@@ -198,12 +213,12 @@
                   <span class="badge bg-info" th:text="${user.role}">USER</span>
                 </td>
                 <td>
-                                            <span th:if="${user.isActive}" class="badge bg-success status-badge">
-                                                <i class="fas fa-check"></i> Actif
-                                            </span>
+                  <span th:if="${user.isActive}" class="badge bg-success status-badge">
+                    <i class="fas fa-check"></i> Actif
+                  </span>
                   <span th:unless="${user.isActive}" class="badge bg-warning status-badge">
-                                                <i class="fas fa-pause"></i> Inactif
-                                            </span>
+                    <i class="fas fa-pause"></i> Inactif
+                  </span>
                 </td>
                 <td>
                   <span th:text="${#temporals.format(user.createdAt, 'dd/MM/yyyy')}">01/01/2024</span><br>
@@ -217,20 +232,53 @@
                 </td>
                 <td>
                   <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn btn-outline-primary" title="Voir détails">
+                    <!-- Voir détails -->
+                    <a th:href="@{/admin/users/{id}(id=${user.id})}"
+                       class="btn btn-outline-primary"
+                       title="Voir détails">
                       <i class="fas fa-eye"></i>
-                    </button>
-                    <button type="button" class="btn btn-outline-warning" title="Modifier">
+                    </a>
+
+                    <!-- Modifier -->
+                    <a th:href="@{/admin/users/{id}/edit(id=${user.id})}"
+                       class="btn btn-outline-warning"
+                       title="Modifier">
                       <i class="fas fa-edit"></i>
-                    </button>
-                    <button type="button" class="btn btn-outline-danger" title="Désactiver"
-                            th:if="${user.isActive}">
-                      <i class="fas fa-ban"></i>
-                    </button>
-                    <button type="button" class="btn btn-outline-success" title="Activer"
-                            th:unless="${user.isActive}">
-                      <i class="fas fa-check"></i>
-                    </button>
+                    </a>
+
+                    <!-- Activer/Désactiver -->
+                    <form th:action="@{/admin/users/{id}/toggle-status(id=${user.id})}"
+                          method="post"
+                          style="display: inline;"
+                          class="toggle-status-form">
+                      <button type="submit"
+                              class="btn btn-outline-warning"
+                              th:classappend="${user.isActive} ? 'btn-outline-warning' : 'btn-outline-success'"
+                              th:title="${user.isActive} ? 'Désactiver' : 'Activer'"
+                              th:if="${user.isActive}">
+                        <i class="fas fa-ban"></i>
+                      </button>
+                      <button type="submit"
+                              class="btn btn-outline-success"
+                              title="Activer"
+                              th:unless="${user.isActive}">
+                        <i class="fas fa-check"></i>
+                      </button>
+                      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    </form>
+
+                    <!-- Supprimer -->
+                    <form th:action="@{/admin/users/{id}/delete(id=${user.id})}"
+                          method="post"
+                          style="display: inline;"
+                          class="delete-user-form">
+                      <button type="submit"
+                              class="btn btn-outline-danger"
+                              title="Supprimer">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    </form>
                   </div>
                 </td>
               </tr>
@@ -250,19 +298,19 @@
             <nav aria-label="Navigation des pages">
               <ul class="pagination pagination-sm mb-0">
                 <li class="page-item" th:classappend="${usersPage.first} ? 'disabled'">
-                  <a class="page-link" th:href="@{/admin/users(page=${currentPage - 1}, search=${search})}">
+                  <a class="page-link" th:href="@{/admin/users(page=${currentPage - 1}, search=${search}, status=${status})}">
                     <i class="fas fa-chevron-left"></i>
                   </a>
                 </li>
 
                 <li class="page-item" th:each="page : ${#numbers.sequence(0, usersPage.totalPages - 1)}"
                     th:classappend="${page == currentPage} ? 'active'">
-                  <a class="page-link" th:href="@{/admin/users(page=${page}, search=${search})}"
+                  <a class="page-link" th:href="@{/admin/users(page=${page}, search=${search}, status=${status})}"
                      th:text="${page + 1}">1</a>
                 </li>
 
                 <li class="page-item" th:classappend="${usersPage.last} ? 'disabled'">
-                  <a class="page-link" th:href="@{/admin/users(page=${currentPage + 1}, search=${search})}">
+                  <a class="page-link" th:href="@{/admin/users(page=${currentPage + 1}, search=${search}, status=${status})}">
                     <i class="fas fa-chevron-right"></i>
                   </a>
                 </li>
@@ -289,21 +337,63 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-  // Gestion des filtres
+  // Gestion des filtres de statut
   document.querySelectorAll('input[name="filter"]').forEach(radio => {
     radio.addEventListener('change', function() {
-      // Ici on pourrait ajouter la logique de filtrage côté client
-      // ou rediriger vers une URL avec paramètres
-      console.log('Filtre sélectionné:', this.id);
+      const currentUrl = new URL(window.location);
+      currentUrl.searchParams.set('status', this.id === 'all' ? '' : this.id);
+      currentUrl.searchParams.delete('page'); // Reset à la page 1
+      if (currentUrl.searchParams.get('search')) {
+        currentUrl.searchParams.set('search', currentUrl.searchParams.get('search'));
+      }
+      window.location.href = currentUrl.toString();
     });
   });
 
-  // Confirmation pour les actions de suppression/désactivation
-  document.querySelectorAll('.btn-outline-danger').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-      if (!confirm('Êtes-vous sûr de vouloir désactiver cet utilisateur ?')) {
+  // Auto-submit du formulaire de recherche avec délai
+  let searchTimeout;
+  document.querySelector('input[name="search"]').addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      if (this.value.length >= 3 || this.value.length === 0) {
+        this.form.submit();
+      }
+    }, 500);
+  });
+
+  // Confirmation pour les actions de suppression
+  document.querySelectorAll('.delete-user-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+      if (!confirm('Êtes-vous sûr de vouloir supprimer définitivement cet utilisateur ? Cette action est irréversible.')) {
         e.preventDefault();
       }
+    });
+  });
+
+  // Confirmation pour les actions d'activation/désactivation
+  document.querySelectorAll('.toggle-status-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+      const isActive = this.querySelector('button .fa-ban') !== null;
+      const action = isActive ? 'désactiver' : 'activer';
+      if (!confirm(`Êtes-vous sûr de vouloir ${action} cet utilisateur ?`)) {
+        e.preventDefault();
+      }
+    });
+  });
+
+  // Auto-dismiss des alertes après 5 secondes
+  setTimeout(() => {
+    document.querySelectorAll('.alert-dismissible').forEach(alert => {
+      const bsAlert = new bootstrap.Alert(alert);
+      bsAlert.close();
+    });
+  }, 5000);
+
+  // Animation des boutons au clic
+  document.querySelectorAll('form button[type="submit"]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      this.disabled = true;
     });
   });
 </script>
