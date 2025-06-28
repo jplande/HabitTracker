@@ -101,20 +101,6 @@ public class UserService {
     }
 
     /**
-     * Supprime un utilisateur (soft delete)
-     */
-    @Transactional
-    public void deleteUser(Long id) {
-        ValidationUtils.validateId(id, "utilisateur");
-
-        User user = findUserEntityById(id);
-        user.setIsActive(false);
-        userRepository.save(user);
-
-        log.info("Utilisateur désactivé: {}", user.getUsername());
-    }
-
-    /**
      * Vérifie si un utilisateur existe
      */
     public boolean existsById(Long id) {
@@ -275,24 +261,6 @@ public class UserService {
     }
 
     /**
-     * Bascule le statut actif/inactif d'un utilisateur
-     */
-    public UserResponse toggleUserStatus(Long userId) {
-        log.info("🔄 Basculement statut utilisateur {}", userId);
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("Utilisateur non trouvé : " + userId));
-
-        user.setIsActive(!user.getIsActive());
-        user.setUpdatedAt(LocalDateTime.now());
-
-        User savedUser = userRepository.save(user);
-        log.info("✅ Statut utilisateur {} basculé vers : {}", userId, savedUser.getIsActive());
-
-        return convertToResponse(savedUser);
-    }
-
-    /**
      * Compte total des utilisateurs
      */
     public long getTotalUsersCount() {
@@ -323,58 +291,163 @@ public class UserService {
                 .build();
     }
 
-    // Ajouter cette méthode dans UserService
+
+// ✅ Ajout/vérification des méthodes manquantes dans UserService.java
 
     /**
-     * Met à jour un utilisateur par un administrateur
-     * Permet de modifier tous les champs y compris rôle et statut
+     * Met à jour un utilisateur par un administrateur - VERSION CORRIGÉE
      */
     @Transactional
     public UserResponse updateUserByAdmin(Long userId, AdminUserUpdateRequest request) {
         log.info("🔧 Mise à jour utilisateur {} par administrateur", userId);
 
-        // Récupération de l'utilisateur existant
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", userId));
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", userId));
 
-        // Vérification unicité username (sauf si inchangé)
-        if (!user.getUsername().equals(request.getUsername()) &&
-                userRepository.existsByUsername(request.getUsername())) {
-            throw new BusinessException("Ce nom d'utilisateur est déjà utilisé : " + request.getUsername());
+            // Vérification unicité username (sauf si inchangé)
+            if (!user.getUsername().equals(request.getUsername()) &&
+                    userRepository.existsByUsername(request.getUsername())) {
+                throw new BusinessException("Ce nom d'utilisateur est déjà utilisé : " + request.getUsername());
+            }
+
+            // Vérification unicité email (sauf si inchangé)
+            if (!user.getEmail().equals(request.getEmail()) &&
+                    userRepository.existsByEmail(request.getEmail())) {
+                throw new BusinessException("Cette adresse email est déjà utilisée : " + request.getEmail());
+            }
+
+            // Mise à jour des champs
+            user.setUsername(request.getUsername());
+            user.setEmail(request.getEmail());
+            user.setFirstName(request.getFirstName());
+            user.setLastName(request.getLastName());
+
+            if (request.getRole() != null) {
+                user.setRole(request.getRole());
+                log.info("👑 Rôle utilisateur {} changé vers : {}", userId, request.getRole());
+            }
+
+            if (request.getIsActive() != null) {
+                user.setIsActive(request.getIsActive());
+                log.info("🔄 Statut utilisateur {} changé vers : {}", userId, request.getIsActive() ? "actif" : "inactif");
+            }
+
+            user.setUpdatedAt(LocalDateTime.now());
+            User savedUser = userRepository.save(user);
+
+            log.info("✅ Utilisateur {} mis à jour avec succès par admin", userId);
+            return UserResponse.fromEntity(savedUser);
+
+        } catch (BusinessException e) {
+            throw e; // Re-throw business exceptions
+        } catch (Exception e) {
+            log.error("❌ Erreur lors de la mise à jour admin utilisateur {}: {}", userId, e.getMessage());
+            throw new BusinessException("Erreur lors de la mise à jour: " + e.getMessage());
         }
+    }
 
-        // Vérification unicité email (sauf si inchangé)
-        if (!user.getEmail().equals(request.getEmail()) &&
-                userRepository.existsByEmail(request.getEmail())) {
-            throw new BusinessException("Cette adresse email est déjà utilisée : " + request.getEmail());
+    /**
+     * ✅ Bascule le statut actif/inactif d'un utilisateur - VERSION CORRIGÉE FINALE
+     */
+    @Transactional
+    public UserResponse toggleUserStatus(Long userId) {
+        log.info("🔄 [SERVICE] Début basculement statut utilisateur {}", userId);
+
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", userId));
+
+            // ✅ Log de l'état actuel
+            Boolean currentStatus = user.getIsActive();
+            log.info("🔄 [SERVICE] Statut actuel utilisateur {}: {}", userId, currentStatus);
+
+            // ✅ Gestion du cas où isActive pourrait être null en base
+            if (currentStatus == null) {
+                log.warn("⚠️ [SERVICE] Statut null pour utilisateur {}, définition à false", userId);
+                user.setIsActive(false);
+                currentStatus = false;
+            }
+
+            // Bascule le statut
+            boolean newStatus = !currentStatus;
+            user.setIsActive(newStatus);
+            user.setUpdatedAt(LocalDateTime.now());
+
+            log.info("🔄 [SERVICE] Nouveau statut utilisateur {}: {} → {}", userId, currentStatus, newStatus);
+
+            // ✅ Sauvegarde avec vérification
+            User savedUser = userRepository.save(user);
+
+            // ✅ Vérification post-sauvegarde
+            if (!savedUser.getIsActive().equals(newStatus)) {
+                log.error("❌ [SERVICE] ERREUR: Sauvegarde échouée. Attendu: {}, Obtenu: {}",
+                        newStatus, savedUser.getIsActive());
+                throw new BusinessException("Échec de la mise à jour du statut utilisateur");
+            }
+
+            log.info("✅ [SERVICE] Statut utilisateur {} basculé avec succès vers : {}", userId, savedUser.getIsActive());
+
+            return UserResponse.fromEntity(savedUser);
+
+        } catch (ResourceNotFoundException e) {
+            log.error("❌ [SERVICE] Utilisateur {} non trouvé", userId);
+            throw e;
+        } catch (Exception e) {
+            log.error("❌ [SERVICE] Erreur lors du basculement du statut utilisateur {}: {}", userId, e.getMessage(), e);
+            throw new BusinessException("Impossible de modifier le statut de l'utilisateur: " + e.getMessage());
         }
+    }
 
-        // Mise à jour des champs obligatoires
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
+    /**
+     * ✅ Supprime un utilisateur (soft delete) - VERSION CORRIGÉE
+     */
+    @Transactional
+    public void deleteUser(Long id) {
+        log.info("🗑️ [SERVICE] Début suppression utilisateur {}", id);
+        ValidationUtils.validateId(id, "utilisateur");
 
-        // Mise à jour des champs optionnels
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
+        try {
+            User user = userRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", id));
 
-        // Mise à jour du rôle (admin seulement)
-        if (request.getRole() != null) {
-            user.setRole(request.getRole());
-            log.info("👑 Rôle utilisateur {} changé vers : {}", userId, request.getRole());
+            log.info("🗑️ [SERVICE] Utilisateur trouvé: {} ({})", user.getUsername(), user.getEmail());
+
+            // ✅ Vérification: ne pas supprimer le dernier admin
+            if (user.getRole() == User.Role.ADMIN) {
+                long adminCount = userRepository.findAll().stream()
+                        .filter(u -> u.getRole() == User.Role.ADMIN && u.getIsActive())
+                        .count();
+
+                if (adminCount <= 1) {
+                    log.warn("⚠️ [SERVICE] Tentative de suppression du dernier admin: {}", user.getUsername());
+                    throw new BusinessException("Impossible de supprimer le dernier administrateur actif");
+                }
+            }
+
+            // ✅ Soft delete : désactiver au lieu de supprimer
+            user.setIsActive(false);
+            user.setUpdatedAt(LocalDateTime.now());
+
+            // ✅ Optionnel: marquer comme supprimé dans l'email pour éviter les conflits
+            String originalEmail = user.getEmail();
+            user.setEmail(originalEmail + ".deleted." + System.currentTimeMillis());
+
+            User savedUser = userRepository.save(user);
+
+            // ✅ Vérification post-suppression
+            if (savedUser.getIsActive()) {
+                log.error("❌ [SERVICE] ERREUR: Suppression échouée pour utilisateur {}", id);
+                throw new BusinessException("Échec de la suppression de l'utilisateur");
+            }
+
+            log.info("✅ [SERVICE] Utilisateur {} supprimé (soft delete): {} → inactif", id, user.getUsername());
+
+        } catch (ResourceNotFoundException | BusinessException e) {
+            throw e; // Re-throw les exceptions métier
+        } catch (Exception e) {
+            log.error("❌ [SERVICE] Erreur lors de la suppression utilisateur {}: {}", id, e.getMessage(), e);
+            throw new BusinessException("Erreur lors de la suppression: " + e.getMessage());
         }
-
-        // Mise à jour du statut actif (admin seulement)
-        if (request.getIsActive() != null) {
-            user.setIsActive(request.getIsActive());
-            log.info("🔄 Statut utilisateur {} changé vers : {}", userId, request.getIsActive() ? "actif" : "inactif");
-        }
-
-        user.setUpdatedAt(LocalDateTime.now());
-
-        // Sauvegarde
-        User savedUser = userRepository.save(user);
-        log.info("✅ Utilisateur {} mis à jour avec succès par admin", userId);
-
-        return convertToResponse(savedUser);
     }
 }

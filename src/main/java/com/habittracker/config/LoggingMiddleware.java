@@ -21,6 +21,12 @@ public class LoggingMiddleware extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
+        // ✅ Ignorer les ressources système pour réduire le spam
+        if (isSystemResource(request.getRequestURI())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         // Génère un ID unique pour la requête
         String requestId = UUID.randomUUID().toString().substring(0, 8);
 
@@ -85,11 +91,12 @@ public class LoggingMiddleware extends OncePerRequestFilter {
         logMessage.append(statusEmoji).append(" ").append(status);
         logMessage.append(" - ").append(duration).append("ms");
 
-        // Log selon le niveau de statut
+        // ✅ Log selon le niveau de statut - réduire le spam pour 404 sur ressources système
         if (status >= 500) {
             log.error(logMessage.toString());
         } else if (status >= 400) {
-            log.warn(logMessage.toString());
+            // ✅ Réduire le niveau pour les 404 sur favicon et autres ressources système
+            log.debug(logMessage.toString());
         } else {
             log.info(logMessage.toString());
         }
@@ -122,10 +129,27 @@ public class LoggingMiddleware extends OncePerRequestFilter {
                 || uri.contains("/favicon.ico") || uri.contains("/static/");
     }
 
+    /**
+     * ✅ Détermine si une ressource est une ressource système à ignorer
+     */
+    private boolean isSystemResource(String uri) {
+        return uri != null && (
+                uri.equals("/favicon.ico") ||
+                        uri.startsWith("/.well-known/") ||
+                        uri.equals("/robots.txt") ||
+                        uri.equals("/sitemap.xml") ||
+                        uri.startsWith("/apple-touch-icon") ||
+                        uri.equals("/browserconfig.xml") ||
+                        uri.equals("/manifest.json")
+        );
+    }
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        // Ne pas logger les health checks et actuator pour éviter le spam
-        return uri.equals("/actuator/health") || uri.startsWith("/actuator/metrics");
+        // ✅ Ne pas logger les health checks et actuator pour éviter le spam
+        return uri.equals("/actuator/health") ||
+                uri.startsWith("/actuator/metrics") ||
+                isSystemResource(uri);
     }
 }

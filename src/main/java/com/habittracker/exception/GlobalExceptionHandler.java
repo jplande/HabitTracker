@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -23,6 +24,33 @@ import java.util.NoSuchElementException;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    /**
+     * Gère les ressources statiques manquantes (favicon, .well-known, etc.)
+     * Ignoré pour réduire le spam dans les logs
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException ex, WebRequest request) {
+        String path = getPath(request);
+
+        // ✅ Ignorer silencieusement les requêtes de ressources système communes
+        if (isSystemResource(path)) {
+            log.debug("🔇 Ressource système ignorée: {}", path);
+            return ResponseEntity.notFound().build();
+        }
+
+        log.warn("🔍 Ressource non trouvée: {}", path);
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error("Ressource non trouvée")
+                .message("La ressource demandée n'existe pas")
+                .path(path)
+                .build();
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
 
     /**
      * Gère les erreurs de validation des champs
@@ -180,14 +208,22 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGlobalException(Exception ex, WebRequest request) {
-        log.error("Erreur inattendue: ", ex);
+        String path = getPath(request);
+
+        // ✅ Réduire le spam pour les erreurs système communes
+        if (isSystemResource(path)) {
+            log.debug("🔇 Erreur système ignorée sur: {}", path);
+            return ResponseEntity.notFound().build();
+        }
+
+        log.error("Erreur inattendue sur {}: ", path, ex);
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .error("Erreur interne du serveur")
                 .message("Une erreur inattendue s'est produite")
-                .path(getPath(request))
+                .path(path)
                 .build();
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
@@ -198,5 +234,20 @@ public class GlobalExceptionHandler {
      */
     private String getPath(WebRequest request) {
         return request.getDescription(false).replace("uri=", "");
+    }
+
+    /**
+     * Détermine si une ressource est une ressource système à ignorer
+     */
+    private boolean isSystemResource(String path) {
+        return path != null && (
+                path.contains("/favicon.ico") ||
+                        path.contains("/.well-known/") ||
+                        path.contains("/robots.txt") ||
+                        path.contains("/sitemap.xml") ||
+                        path.contains("/apple-touch-icon") ||
+                        path.contains("/browserconfig.xml") ||
+                        path.contains("/manifest.json")
+        );
     }
 }

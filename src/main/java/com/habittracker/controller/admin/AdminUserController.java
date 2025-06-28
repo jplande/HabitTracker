@@ -16,10 +16,11 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 
 /**
- * Contrôleur CRUD pour la gestion des utilisateurs en admin
+ * Contrôleur CRUD pour la gestion des utilisateurs en admin - VERSION DEBUG
  */
 @Controller
 @RequestMapping("/admin/users")
@@ -38,19 +39,17 @@ public class AdminUserController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) String status, // active, inactive, all
+            @RequestParam(required = false) String status,
             Model model) {
 
-        log.info("📋 Liste utilisateurs - page: {}, recherche: '{}', statut: '{}'", page, search, status);
+        log.info("📋 [ADMIN] Liste utilisateurs - page: {}, recherche: '{}', statut: '{}'", page, search, status);
 
         try {
-            // Configuration pagination avec tri par date de création
             Pageable pageable = PageRequest.of(page, size,
                     Sort.by(Sort.Direction.DESC, "createdAt"));
 
             Page<UserResponse> usersPage;
 
-            // Filtrage selon les paramètres
             if (search != null && !search.trim().isEmpty()) {
                 usersPage = userService.searchUsers(search.trim(), pageable);
             } else if ("active".equals(status)) {
@@ -61,21 +60,21 @@ public class AdminUserController {
                 usersPage = userService.findAllUsers(pageable);
             }
 
-            // Ajout des données au modèle
             model.addAttribute("usersPage", usersPage);
             model.addAttribute("currentPage", page);
             model.addAttribute("search", search);
             model.addAttribute("status", status);
 
-            // Statistiques utilisateurs
             addUserStatsToModel(model);
 
             model.addAttribute("pageTitle", "Gestion des Utilisateurs");
             model.addAttribute("currentNavPage", "users");
 
+            log.info("✅ [ADMIN] Liste chargée: {} utilisateurs trouvés", usersPage.getTotalElements());
+
         } catch (Exception e) {
-            log.error("❌ Erreur lors du chargement des utilisateurs", e);
-            model.addAttribute("error", "Erreur lors du chargement des utilisateurs");
+            log.error("❌ [ADMIN] Erreur lors du chargement des utilisateurs", e);
+            model.addAttribute("error", "Erreur lors du chargement des utilisateurs: " + e.getMessage());
         }
 
         return "admin/users";
@@ -85,21 +84,18 @@ public class AdminUserController {
      * Affichage des détails d'un utilisateur
      */
     @GetMapping("/{id}")
-    public String viewUser(@PathVariable Long id, Model model) {
-        log.info("👁️ Affichage utilisateur {}", id);
+    public String viewUser(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
+        log.info("👁️ [ADMIN] Affichage utilisateur {}", id);
 
         try {
             UserResponse user = userService.findById(id);
             model.addAttribute("user", user);
-
-            // Statistiques de l'utilisateur
             addUserDetailsToModel(model, id);
-
             model.addAttribute("pageTitle", "Détails - " + user.getUsername());
 
         } catch (Exception e) {
-            log.error("❌ Erreur lors du chargement de l'utilisateur {}", id, e);
-            model.addAttribute("error", "Utilisateur introuvable");
+            log.error("❌ [ADMIN] Erreur lors du chargement de l'utilisateur {}", id, e);
+            redirectAttributes.addFlashAttribute("error", "Utilisateur introuvable: " + e.getMessage());
             return "redirect:/admin/users";
         }
 
@@ -110,8 +106,8 @@ public class AdminUserController {
      * Formulaire d'édition d'un utilisateur
      */
     @GetMapping("/{id}/edit")
-    public String editUserForm(@PathVariable Long id, Model model) {
-        log.info("✏️ Formulaire édition utilisateur {}", id);
+    public String editUserForm(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
+        log.info("✏️ [ADMIN] Formulaire édition utilisateur {}", id);
 
         try {
             UserResponse user = userService.findById(id);
@@ -119,8 +115,8 @@ public class AdminUserController {
             model.addAttribute("pageTitle", "Modifier - " + user.getUsername());
 
         } catch (Exception e) {
-            log.error("❌ Erreur lors du chargement pour édition de l'utilisateur {}", id, e);
-            model.addAttribute("error", "Utilisateur introuvable");
+            log.error("❌ [ADMIN] Erreur lors du chargement pour édition de l'utilisateur {}", id, e);
+            redirectAttributes.addFlashAttribute("error", "Utilisateur introuvable: " + e.getMessage());
             return "redirect:/admin/users";
         }
 
@@ -128,7 +124,7 @@ public class AdminUserController {
     }
 
     /**
-     * Mise à jour d'un utilisateur
+     * ✅ Mise à jour d'un utilisateur - VERSION DEBUG ÉTENDU
      */
     @PostMapping("/{id}/update")
     public String updateUser(
@@ -138,87 +134,56 @@ public class AdminUserController {
             @RequestParam(required = false) String firstName,
             @RequestParam(required = false) String lastName,
             @RequestParam User.Role role,
-            @RequestParam(required = false, defaultValue = "false") Boolean isActive,
-            RedirectAttributes redirectAttributes) {
+            @RequestParam(required = false) Boolean isActive,
+            RedirectAttributes redirectAttributes,
+            HttpServletRequest request) {
 
-        log.info("💾 Mise à jour utilisateur {} via formulaire", id);
+        log.info("🔥 [ADMIN] ========== DÉBUT MISE À JOUR UTILISATEUR {} ==========", id);
+        log.info("🔥 [ADMIN] Paramètres reçus:");
+        log.info("🔥 [ADMIN]   - username: '{}'", username);
+        log.info("🔥 [ADMIN]   - email: '{}'", email);
+        log.info("🔥 [ADMIN]   - firstName: '{}'", firstName);
+        log.info("🔥 [ADMIN]   - lastName: '{}'", lastName);
+        log.info("🔥 [ADMIN]   - role: '{}'", role);
+        log.info("🔥 [ADMIN]   - isActive: '{}'", isActive);
+        log.info("🔥 [ADMIN]   - Method: {}", request.getMethod());
+        log.info("🔥 [ADMIN]   - Content-Type: {}", request.getContentType());
 
         try {
-            // Construction du DTO admin
-            AdminUserUpdateRequest request = AdminUserUpdateRequest.builder()
+            // ✅ Gestion correcte de la checkbox
+            boolean activeStatus = Boolean.TRUE.equals(isActive);
+            log.info("🔥 [ADMIN] Statut actif calculé: {}", activeStatus);
+
+            AdminUserUpdateRequest updateRequest = AdminUserUpdateRequest.builder()
                     .username(username)
                     .email(email)
                     .firstName(firstName)
                     .lastName(lastName)
                     .role(role)
-                    .isActive(isActive)
+                    .isActive(activeStatus)
                     .build();
 
-            UserResponse updatedUser = userService.updateUserByAdmin(id, request);
-            log.info("✅ Utilisateur {} mis à jour avec succès", id);
+            log.info("🔥 [ADMIN] Requête construite: {}", updateRequest);
+
+            UserResponse updatedUser = userService.updateUserByAdmin(id, updateRequest);
+            log.info("✅ [ADMIN] Utilisateur {} mis à jour avec succès: {}", id, updatedUser.getUsername());
 
             redirectAttributes.addFlashAttribute("success",
                     "Utilisateur '" + updatedUser.getUsername() + "' mis à jour avec succès");
 
+            log.info("🔥 [ADMIN] Redirection vers /admin/users/{}", id);
             return "redirect:/admin/users/" + id;
 
         } catch (Exception e) {
-            log.error("❌ Erreur lors de la mise à jour de l'utilisateur {}", id, e);
+            log.error("❌ [ADMIN] ERREUR lors de la mise à jour de l'utilisateur {}", id, e);
             redirectAttributes.addFlashAttribute("error",
                     "Erreur lors de la mise à jour : " + e.getMessage());
 
+            log.info("🔥 [ADMIN] Redirection vers /admin/users/{}/edit après erreur", id);
             return "redirect:/admin/users/" + id + "/edit";
+        } finally {
+            log.info("🔥 [ADMIN] ========== FIN MISE À JOUR UTILISATEUR {} ==========", id);
         }
-    }
-
-    /**
-     * Activation/Désactivation d'un utilisateur
-     */
-    @PostMapping("/{id}/toggle-status")
-    public String toggleUserStatus(@PathVariable Long id, RedirectAttributes redirectAttributes) {
-        log.info("🔄 Changement de statut utilisateur {}", id);
-
-        try {
-            UserResponse user = userService.toggleUserStatus(id);
-            String status = user.getIsActive() ? "activé" : "désactivé";
-
-            log.info("✅ Utilisateur {} {} avec succès", id, status);
-            redirectAttributes.addFlashAttribute("success",
-                    "Utilisateur '" + user.getUsername() + "' " + status + " avec succès");
-
-        } catch (Exception e) {
-            log.error("❌ Erreur lors du changement de statut de l'utilisateur {}", id, e);
-            redirectAttributes.addFlashAttribute("error",
-                    "Erreur lors du changement de statut : " + e.getMessage());
-        }
-
-        return "redirect:/admin/users";
-    }
-
-    /**
-     * Suppression d'un utilisateur (avec confirmation)
-     */
-    @PostMapping("/{id}/delete")
-    public String deleteUser(@PathVariable Long id, RedirectAttributes redirectAttributes) {
-        log.info("🗑️ Suppression utilisateur {}", id);
-
-        try {
-            UserResponse user = userService.findById(id);
-            String username = user.getUsername();
-
-            userService.deleteUser(id);
-
-            log.info("✅ Utilisateur {} supprimé avec succès", id);
-            redirectAttributes.addFlashAttribute("success",
-                    "Utilisateur '" + username + "' supprimé avec succès");
-
-        } catch (Exception e) {
-            log.error("❌ Erreur lors de la suppression de l'utilisateur {}", id, e);
-            redirectAttributes.addFlashAttribute("error",
-                    "Erreur lors de la suppression : " + e.getMessage());
-        }
-
-        return "redirect:/admin/users";
     }
 
     /**
@@ -230,17 +195,14 @@ public class AdminUserController {
             @RequestParam(required = false) String status,
             RedirectAttributes redirectAttributes) {
 
-        log.info("📥 Export utilisateurs demandé");
+        log.info("📥 [ADMIN] Export utilisateurs demandé");
 
         try {
-            // Ici tu peux appeler un service d'export
-            // String filePath = userService.exportToCsv(search, status);
-
             redirectAttributes.addFlashAttribute("success",
                     "Export en cours... Le fichier sera disponible sous peu.");
 
         } catch (Exception e) {
-            log.error("❌ Erreur lors de l'export", e);
+            log.error("❌ [ADMIN] Erreur lors de l'export", e);
             redirectAttributes.addFlashAttribute("error",
                     "Erreur lors de l'export : " + e.getMessage());
         }
@@ -250,9 +212,6 @@ public class AdminUserController {
 
     // === MÉTHODES UTILITAIRES ===
 
-    /**
-     * Ajoute les statistiques utilisateurs au modèle
-     */
     private void addUserStatsToModel(Model model) {
         try {
             long totalUsers = userService.getTotalUsersCount();
@@ -266,18 +225,12 @@ public class AdminUserController {
             ));
 
         } catch (Exception e) {
-            log.warn("⚠️ Impossible de charger les statistiques utilisateurs", e);
+            log.warn("⚠️ [ADMIN] Impossible de charger les statistiques utilisateurs", e);
         }
     }
 
-    /**
-     * Ajoute les détails complémentaires d'un utilisateur
-     */
     private void addUserDetailsToModel(Model model, Long userId) {
         try {
-            // Tu peux ajouter ici des statistiques spécifiques à l'utilisateur
-            // Par exemple : nombre d'habitudes, progressions récentes, etc.
-
             model.addAttribute("userDetails", Map.of(
                     "habitCount", "Non implémenté",
                     "progressCount", "Non implémenté",
@@ -285,7 +238,101 @@ public class AdminUserController {
             ));
 
         } catch (Exception e) {
-            log.warn("⚠️ Impossible de charger les détails de l'utilisateur {}", userId, e);
+            log.warn("⚠️ [ADMIN] Impossible de charger les détails de l'utilisateur {}", userId, e);
         }
+    }
+
+    /**
+     * ✅ Activation/Désactivation - VERSION DEBUG ÉTENDU
+     */
+    @PostMapping("/{id}/toggle-status")
+    public String toggleUserStatus(@PathVariable Long id, RedirectAttributes redirectAttributes, HttpServletRequest request) {
+        log.info("🔥 [ADMIN] ========== DÉBUT TOGGLE STATUS UTILISATEUR {} ==========", id);
+        log.info("🔥 [ADMIN] Method: {}, Content-Type: {}", request.getMethod(), request.getContentType());
+        log.info("🔥 [ADMIN] Headers: {}",
+                request.getHeaderNames() != null ?
+                        java.util.Collections.list(request.getHeaderNames()) : "None");
+
+        try {
+            // ✅ Vérifier l'utilisateur AVANT le toggle
+            UserResponse userBefore = userService.findById(id);
+            log.info("🔥 [ADMIN] État AVANT toggle: {} (actif: {})", userBefore.getUsername(), userBefore.getIsActive());
+
+            // ✅ Effectuer le toggle
+            UserResponse userAfter = userService.toggleUserStatus(id);
+            log.info("🔥 [ADMIN] État APRÈS toggle: {} (actif: {})", userAfter.getUsername(), userAfter.getIsActive());
+
+            // ✅ Vérifier que le changement a bien eu lieu
+            if (userBefore.getIsActive().equals(userAfter.getIsActive())) {
+                log.error("❌ [ADMIN] PROBLÈME: Aucun changement détecté ! Avant: {}, Après: {}",
+                        userBefore.getIsActive(), userAfter.getIsActive());
+                redirectAttributes.addFlashAttribute("error",
+                        "Erreur: Le statut n'a pas pu être modifié");
+                return "redirect:/admin/users";
+            }
+
+            String status = userAfter.getIsActive() ? "activé" : "désactivé";
+            log.info("✅ [ADMIN] Utilisateur {} {} avec succès", id, status);
+
+            redirectAttributes.addFlashAttribute("success",
+                    "Utilisateur '" + userAfter.getUsername() + "' " + status + " avec succès");
+
+        } catch (Exception e) {
+            log.error("❌ [ADMIN] Erreur lors du changement de statut de l'utilisateur {}", id, e);
+            redirectAttributes.addFlashAttribute("error",
+                    "Erreur lors du changement de statut : " + e.getMessage());
+        } finally {
+            log.info("🔥 [ADMIN] ========== FIN TOGGLE STATUS UTILISATEUR {} ==========", id);
+        }
+
+        log.info("🔥 [ADMIN] Redirection vers /admin/users");
+        return "redirect:/admin/users";
+    }
+
+    /**
+     * ✅ Suppression - VERSION DEBUG ÉTENDU
+     */
+    @PostMapping("/{id}/delete")
+    public String deleteUser(@PathVariable Long id, RedirectAttributes redirectAttributes, HttpServletRequest request) {
+        log.info("🔥 [ADMIN] ========== DÉBUT SUPPRESSION UTILISATEUR {} ==========", id);
+        log.info("🔥 [ADMIN] Method: {}, Content-Type: {}", request.getMethod(), request.getContentType());
+
+        try {
+            // ✅ Vérifier l'utilisateur AVANT suppression
+            UserResponse userBefore = userService.findById(id);
+            log.info("🔥 [ADMIN] Utilisateur à supprimer: {} ({})", userBefore.getUsername(), userBefore.getEmail());
+            log.info("🔥 [ADMIN] Rôle: {}, Actif: {}", userBefore.getRole(), userBefore.getIsActive());
+
+            // ✅ Effectuer la suppression
+            userService.deleteUser(id);
+            log.info("✅ [ADMIN] Service de suppression terminé pour utilisateur {}", id);
+
+            // ✅ Vérifier que la suppression a eu lieu
+            try {
+                UserResponse userAfter = userService.findById(id);
+                if (userAfter.getIsActive()) {
+                    log.error("❌ [ADMIN] PROBLÈME: Utilisateur {} toujours actif après suppression", id);
+                    redirectAttributes.addFlashAttribute("error",
+                            "Erreur: L'utilisateur n'a pas pu être supprimé");
+                    return "redirect:/admin/users";
+                }
+                log.info("✅ [ADMIN] Vérification: Utilisateur {} bien désactivé", id);
+            } catch (Exception e) {
+                log.info("✅ [ADMIN] Utilisateur {} introuvable après suppression (normal si hard delete)", id);
+            }
+
+            redirectAttributes.addFlashAttribute("success",
+                    "Utilisateur '" + userBefore.getUsername() + "' supprimé avec succès");
+
+        } catch (Exception e) {
+            log.error("❌ [ADMIN] Erreur lors de la suppression de l'utilisateur {}", id, e);
+            redirectAttributes.addFlashAttribute("error",
+                    "Erreur lors de la suppression : " + e.getMessage());
+        } finally {
+            log.info("🔥 [ADMIN] ========== FIN SUPPRESSION UTILISATEUR {} ==========", id);
+        }
+
+        log.info("🔥 [ADMIN] Redirection vers /admin/users");
+        return "redirect:/admin/users";
     }
 }
