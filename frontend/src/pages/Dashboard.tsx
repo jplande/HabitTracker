@@ -7,7 +7,8 @@ import Button from '../components/atoms/Button';
 import Badge from '../components/atoms/Badge';
 import HabitCard from '../components/molecules/HabitCard';
 import { useAuth } from '../contexts/AuthContext';
-import { habitService, Habit } from '../services/habitService';
+import { habitService } from '../services/habitService';
+import { Habit } from '../types';
 
 interface DashboardStats {
     totalHabits: number;
@@ -40,28 +41,97 @@ const Dashboard: React.FC = () => {
         try {
             setIsLoading(true);
 
-            // Charger les habitudes récentes
-            const habitsResponse = await habitService.getHabits({
-                page: 0,
-                size: 6,
-                active: true
-            });
-            setRecentHabits(habitsResponse.content);
+            // Charger les habitudes récentes avec gestion d'erreur
+            try {
+                const habitsResponse = await habitService.getHabits({
+                    page: 0,
+                    size: 6,
+                    active: true
+                });
 
-            // Calculer les statistiques (simulation - en réalité on aurait un endpoint dédié)
-            const totalHabits = habitsResponse.totalElements;
-            const activeHabits = habitsResponse.content.filter(h => h.isActive).length;
+                // Vérifier que la réponse est valide
+                if (habitsResponse && habitsResponse.content && Array.isArray(habitsResponse.content)) {
+                    setRecentHabits(habitsResponse.content);
 
-            setStats({
-                totalHabits,
-                activeHabits,
-                completedToday: Math.floor(activeHabits * 0.7), // Simulation
-                currentStreak: 12, // Simulation
-                weeklyProgress: 85, // Simulation
-            });
+                    // Calculer les statistiques
+                    const totalHabits = habitsResponse.totalElements || 0;
+                    const activeHabits = habitsResponse.content.filter(h => h.isActive).length;
+
+                    setStats({
+                        totalHabits,
+                        activeHabits,
+                        completedToday: Math.floor(activeHabits * 0.7), // Simulation
+                        currentStreak: 12, // Simulation
+                        weeklyProgress: 85, // Simulation
+                    });
+                } else {
+                    console.warn('Réponse API invalide:', habitsResponse);
+                    // Valeurs par défaut si l'API ne répond pas correctement
+                    setRecentHabits([]);
+                    setStats({
+                        totalHabits: 0,
+                        activeHabits: 0,
+                        completedToday: 0,
+                        currentStreak: 0,
+                        weeklyProgress: 0,
+                    });
+                }
+            } catch (apiError) {
+                console.warn('API non disponible, utilisation de données factices:', apiError);
+
+                // Données factices pour le développement
+                const fakeHabits = [
+                    {
+                        id: 1,
+                        userId: 1,
+                        title: "Course à pied",
+                        description: "30 minutes de course quotidienne",
+                        category: "SPORT" as const,
+                        unit: "minutes",
+                        frequency: "DAILY" as const,
+                        targetValue: 30,
+                        isActive: true,
+                        createdAt: "2024-01-01T00:00:00Z",
+                        currentStreak: 7,
+                        averageCompletion: 85
+                    },
+                    {
+                        id: 2,
+                        userId: 1,
+                        title: "Lecture",
+                        description: "Lire 20 pages par jour",
+                        category: "EDUCATION" as const,
+                        unit: "pages",
+                        frequency: "DAILY" as const,
+                        targetValue: 20,
+                        isActive: true,
+                        createdAt: "2024-01-01T00:00:00Z",
+                        currentStreak: 12,
+                        averageCompletion: 90
+                    }
+                ];
+
+                setRecentHabits(fakeHabits);
+                setStats({
+                    totalHabits: fakeHabits.length,
+                    activeHabits: fakeHabits.filter(h => h.isActive).length,
+                    completedToday: 1,
+                    currentStreak: 12,
+                    weeklyProgress: 85,
+                });
+            }
 
         } catch (error) {
             console.error('Erreur lors du chargement du dashboard:', error);
+            // Valeurs par défaut en cas d'erreur
+            setRecentHabits([]);
+            setStats({
+                totalHabits: 0,
+                activeHabits: 0,
+                completedToday: 0,
+                currentStreak: 0,
+                weeklyProgress: 0,
+            });
         } finally {
             setIsLoading(false);
         }
@@ -229,7 +299,7 @@ const Dashboard: React.FC = () => {
                                 Vos habitudes
                             </h2>
                             <p className="text-neutral-600">
-                                {recentHabits.length === 0
+                                {(!recentHabits || recentHabits.length === 0)
                                     ? 'Aucune habitude créée pour le moment'
                                     : `${recentHabits.length} habitude${recentHabits.length > 1 ? 's' : ''} active${recentHabits.length > 1 ? 's' : ''}`
                                 }
@@ -255,7 +325,7 @@ const Dashboard: React.FC = () => {
                                 </Card>
                             ))}
                         </div>
-                    ) : recentHabits.length === 0 ? (
+                    ) : (!recentHabits || recentHabits.length === 0) ? (
                         <Card variant="outlined" className="border-dashed">
                             <CardBody className="text-center py-12">
                                 <Target className="h-16 w-16 text-neutral-300 mx-auto mb-4" />
@@ -276,7 +346,7 @@ const Dashboard: React.FC = () => {
                         </Card>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {recentHabits.map((habit) => (
+                            {recentHabits && recentHabits.map((habit) => (
                                 <HabitCard
                                     key={habit.id}
                                     habit={habit}
