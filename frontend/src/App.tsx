@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Habits from './pages/Habits';
+import Profile from './pages/Profile';
 
 // Styles
 import './index.css';
@@ -129,7 +130,8 @@ function App() {
                                 path="/profile"
                                 element={
                                     <ProtectedRoute>
-                                        <ComingSoon title="Profil Utilisateur" />
+                                        <Profile />
+                                        {/* <ComingSoon title="Profil Utilisateur" /> */}
                                     </ProtectedRoute>
                                 }
                             />
