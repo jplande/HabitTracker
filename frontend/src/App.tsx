@@ -9,6 +9,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Habits from './pages/Habits';
 import Profile from './pages/Profile';
+import Setting from './pages/Setting';
 
 // Styles
 import './index.css';
@@ -139,7 +140,8 @@ function App() {
                                 path="/settings"
                                 element={
                                     <ProtectedRoute>
-                                        <ComingSoon title="Paramètres" />
+                                        <Setting />
+                                        {/* <ComingSoon title="Paramètres" /> */}
                                     </ProtectedRoute>
                                 }
                             />
