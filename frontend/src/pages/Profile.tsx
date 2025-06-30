@@ -3,9 +3,39 @@ import { useAuth } from '../contexts/AuthContext';
 import MainLayout from '../components/templates/MainLayout';
 import Card, { CardBody, CardHeader } from '../components/atoms/Card';
 import { User } from 'lucide-react';
-
+import Button from '../components/atoms/Button';
+import { useNavigate } from 'react-router-dom';
+import { habitService, Habit } from '../services/habitService';
+import { useState, useEffect } from 'react';
 const Profile: React.FC = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
+
+
+
+    const [habits, setHabits] = useState<Habit[]>([]);
+    const [loadingHabits, setLoadingHabits] = useState(true);
+
+    useEffect(() => {
+        const fetchHabits = async () => {
+            try {
+                const response = await habitService.getHabits({ page: 0, size: 100 });
+                setHabits(response.content || []);
+            } catch (error) {
+                console.error('Erreur lors du chargement des habitudes :', error);
+            } finally {
+                setLoadingHabits(false);
+            }
+        };
+
+        fetchHabits();
+    }, []);
+
+    const globalSuccessRate = habits.length > 0
+        ? Math.round(
+            habits.reduce((acc, habit) => acc + (habit.averageCompletion ?? 0), 0) / habits.length
+        )
+        : 0;
 
     if (!user) {
         return (
@@ -14,6 +44,7 @@ const Profile: React.FC = () => {
             </MainLayout>
         );
     }
+
 
     return (
         <MainLayout title="Mon profil">
@@ -45,6 +76,32 @@ const Profile: React.FC = () => {
                         <div className="flex">
                             <span className="font-semibold text-neutral-700 mr-2">Email :</span>
                             <span className="text-neutral-800">{user.email}</span>
+                        </div>
+
+                        {/* Statistiques  */}
+                        <div className="pt-4 border-t space-y-1">
+                            {loadingHabits ? (
+                                <div className="text-sm text-neutral-500">Chargement des habitudes...</div>
+                            ) : habits.length === 0 ? (
+                                <div className="text-sm italic text-neutral-500">Aucune habitude suivie pour l'instant.</div>
+                            ) : (
+                                <>
+                                    <div className="flex">
+                                        <span className="font-semibold mr-2">Nombre d'habitudes :</span>
+                                        <span>{habits.length}</span>
+                                    </div>
+                                    <div className="flex">
+                                        <span className="font-semibold mr-2">Taux de réussite global :</span>
+                                        <span>{globalSuccessRate}%</span>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-4 pt-4 border-t">
+                            <Button onClick={() => navigate('/habits')}>Mes habitudes</Button>
+                            <Button variant="ghost" onClick={() => navigate('/settings')}>Paramètres</Button>
                         </div>
                     </CardBody>
 
