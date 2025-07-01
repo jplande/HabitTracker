@@ -33,6 +33,12 @@
       position: relative;
       height: 250px;
     }
+    .no-data-message {
+      color: #6c757d;
+      font-style: italic;
+      text-align: center;
+      padding: 2rem;
+    }
   </style>
 </head>
 <body>
@@ -82,14 +88,16 @@
         <h1 class="h2"><i class="fas fa-bullseye"></i> Gestion des Habitudes</h1>
         <div class="btn-toolbar mb-2 mb-md-0">
           <div class="btn-group me-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary">
-              <i class="fas fa-download"></i> Export
-            </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="location.reload()">
               <i class="fas fa-sync"></i> Actualiser
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- Alertes d'erreur -->
+      <div th:if="${error}" class="alert alert-danger" role="alert">
+        <i class="fas fa-exclamation-triangle"></i> <span th:text="${error}">Erreur</span>
       </div>
 
       <!-- Statistiques des habitudes -->
@@ -123,8 +131,14 @@
         </div>
       </div>
 
-      <!-- Graphiques et analyses -->
-      <div class="row mb-4">
+      <!-- Message si aucune habitude -->
+      <div th:if="${habitStats?.totalHabits == 0}" class="alert alert-info" role="alert">
+        <i class="fas fa-info-circle"></i>
+        <strong>Information :</strong> Aucune habitude créée pour le moment. Les statistiques apparaîtront lorsque les utilisateurs commenceront à créer des habitudes.
+      </div>
+
+      <!-- ✅ CORRECTION: Vérification simplifiée pour les graphiques -->
+      <div class="row mb-4" th:if="${habitsByCategory != null and habitsByCategory.size() > 0}">
         <!-- Répartition par catégorie -->
         <div class="col-md-6">
           <div class="card">
@@ -148,16 +162,16 @@
             <div class="card-body">
               <div th:if="${popularHabits}">
                 <div class="mb-3">
-                  <h6 class="text-muted">Plus créée</h6>
-                  <p class="h5 text-primary" th:text="${popularHabits.mostCreated}">Course à pied</p>
+                  <h6 class="text-muted">Catégorie la plus populaire</h6>
+                  <p class="h5 text-primary" th:text="${popularHabits.mostCreated}">Aucune donnée</p>
                 </div>
                 <div class="mb-3">
-                  <h6 class="text-muted">Plus de progressions</h6>
-                  <p class="h5 text-success" th:text="${popularHabits.mostProgressed}">Lecture quotidienne</p>
+                  <h6 class="text-muted">Habitude avec le plus de suivi</h6>
+                  <p class="h5 text-success" th:text="${popularHabits.mostProgressed}">Aucune donnée</p>
                 </div>
                 <div class="mb-3">
-                  <h6 class="text-muted">Meilleur taux de completion</h6>
-                  <p class="h5 text-info" th:text="${popularHabits.bestCompletion}">Boire de l'eau</p>
+                  <h6 class="text-muted">Analyse de performance</h6>
+                  <p class="h5 text-info" th:text="${popularHabits.bestCompletion}">En cours d'analyse</p>
                 </div>
               </div>
             </div>
@@ -165,8 +179,23 @@
         </div>
       </div>
 
-      <!-- Liste détaillée par catégorie -->
-      <div class="row" th:if="${habitsByCategory}">
+      <!-- ✅ CORRECTION: Message si pas de données pour les graphiques -->
+      <div th:if="${habitsByCategory == null or habitsByCategory.size() == 0}" class="row mb-4">
+        <div class="col-md-12">
+          <div class="card">
+            <div class="card-body">
+              <div class="no-data-message">
+                <i class="fas fa-chart-pie fa-3x mb-3"></i>
+                <h5>Aucune donnée à afficher</h5>
+                <p>Les graphiques et analyses apparaîtront une fois que des habitudes seront créées par les utilisateurs.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ✅ CORRECTION: Liste détaillée par catégorie avec vérification simplifiée -->
+      <div class="row" th:if="${habitsByCategory != null and habitsByCategory.size() > 0}">
         <div class="col-md-12">
           <div class="card">
             <div class="card-header">
@@ -191,7 +220,9 @@
 
                       <!-- Badge avec pourcentage -->
                       <span class="badge bg-light text-dark category-badge mt-2"
-                            th:text="${#numbers.formatDecimal((category.value / 183.0) * 100, 1, 1)} + '%'">0%</span>
+                            th:text="${habitStats?.totalHabits != null and habitStats.totalHabits > 0 ?
+                                     #numbers.formatDecimal((category.value / habitStats.totalHabits) * 100, 1, 1) + '%' : '0%'}"
+                            th:if="${habitStats?.totalHabits != null and habitStats.totalHabits > 0}">0%</span>
                     </div>
                   </div>
                 </div>
@@ -201,8 +232,8 @@
         </div>
       </div>
 
-      <!-- Tendances et insights -->
-      <div class="row mt-4">
+      <!-- ✅ CORRECTION: Tendances et insights avec vérification simplifiée -->
+      <div class="row mt-4" th:if="${habitStats?.totalHabits != null and habitStats.totalHabits > 0}">
         <div class="col-md-12">
           <div class="card">
             <div class="card-header">
@@ -213,22 +244,23 @@
                 <div class="col-md-3 text-center">
                   <i class="fas fa-trophy fa-2x text-warning mb-2"></i>
                   <h6>Catégorie Leader</h6>
-                  <p class="text-muted">Sport & Fitness</p>
+                  <p class="text-muted" th:text="${popularHabits?.mostCreated ?: 'En analyse'}">En analyse</p>
                 </div>
                 <div class="col-md-3 text-center">
                   <i class="fas fa-chart-line fa-2x text-success mb-2"></i>
-                  <h6>Croissance</h6>
-                  <p class="text-muted">+15% ce mois</p>
+                  <h6>Total Habitudes</h6>
+                  <p class="text-muted" th:text="${habitStats.totalHabits} + ' créées'">0 créées</p>
                 </div>
                 <div class="col-md-3 text-center">
                   <i class="fas fa-clock fa-2x text-info mb-2"></i>
-                  <h6>Fréquence Populaire</h6>
-                  <p class="text-muted">Quotidienne (78%)</p>
+                  <h6>Taux d'Activation</h6>
+                  <p class="text-muted"
+                     th:text="${habitStats.totalHabits > 0 ? #numbers.formatDecimal((habitStats.activeHabits / habitStats.totalHabits) * 100, 1, 1) + '%' : '0%'}">0%</p>
                 </div>
                 <div class="col-md-3 text-center">
                   <i class="fas fa-users fa-2x text-primary mb-2"></i>
-                  <h6>Utilisateurs Actifs</h6>
-                  <p class="text-muted">85% ont ≥1 habitude</p>
+                  <h6>Engagement</h6>
+                  <p class="text-muted">Données réelles</p>
                 </div>
               </div>
             </div>
@@ -242,24 +274,28 @@
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- Charts -->
-<script th:if="${habitsByCategory}">
+<!-- ✅ CORRECTION: Charts avec vérification simplifiée -->
+<script th:if="${habitsByCategory != null and habitsByCategory.size() > 0}">
   // Graphique en camembert pour les catégories
   const categoryCtx = document.getElementById('categoryChart').getContext('2d');
 
   // Préparer les données depuis Thymeleaf
-  const categoryData = {
-    /*[[${habitsByCategory}]]*/
-    'SPORT': 45,
-    'SANTE': 38,
-    'EDUCATION': 32,
-    'TRAVAIL': 28,
-    'LIFESTYLE': 25,
-    'AUTRE': 15
-  };
+  const categoryData = /*[[${habitsByCategory}]]*/ {};
 
   const labels = Object.keys(categoryData);
   const data = Object.values(categoryData);
+
+  // Couleurs pour chaque catégorie
+  const colorMap = {
+    'SPORT': '#dc3545',
+    'SANTE': '#28a745',
+    'EDUCATION': '#007bff',
+    'TRAVAIL': '#ffc107',
+    'LIFESTYLE': '#17a2b8',
+    'AUTRE': '#6c757d'
+  };
+
+  const backgroundColors = labels.map(label => colorMap[label] || '#6c757d');
 
   new Chart(categoryCtx, {
     type: 'doughnut',
@@ -267,14 +303,7 @@
       labels: labels,
       datasets: [{
         data: data,
-        backgroundColor: [
-          '#dc3545', // SPORT - Rouge
-          '#28a745', // SANTE - Vert
-          '#007bff', // EDUCATION - Bleu
-          '#ffc107', // TRAVAIL - Jaune
-          '#17a2b8', // LIFESTYLE - Cyan
-          '#6c757d'  // AUTRE - Gris
-        ],
+        backgroundColor: backgroundColors,
         borderWidth: 2,
         borderColor: '#fff'
       }]
@@ -302,6 +331,11 @@
       }
     }
   });
+</script>
+
+<!-- Message si pas de données pour les graphiques -->
+<script th:if="${habitsByCategory == null or habitsByCategory.size() == 0}">
+  console.log('📊 Habitudes: Graphiques non affichés - aucune habitude créée');
 </script>
 </body>
 </html>
