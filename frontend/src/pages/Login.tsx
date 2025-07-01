@@ -175,7 +175,7 @@ const Login: React.FC = () => {
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-neutral-600">Utilisateur:</span>
-                                <span className="font-mono text-neutral-800">john_doe / password123</span>
+                                <span className="font-mono text-neutral-800">alice_novice / password123</span>
                             </div>
                         </div>
                     </CardBody>
