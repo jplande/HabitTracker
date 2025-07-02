@@ -7,6 +7,7 @@ Application de suivi d'habitudes développée avec Spring Boot et React.
 - **Backend** : Spring Boot + PostgreSQL + Redis
 - **Frontend** : React + TypeScript + Tailwind CSS
 - **Admin** : Thymeleaf
+- **Doc** : Swagger
 
 ##  Prérequis
 
