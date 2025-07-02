@@ -18,7 +18,7 @@ Application de suivi d'habitudes développée avec Spring Boot et React.
 
 ### 1. Cloner le projet
 ```bash
-git clone https://github.com/votre-username/habit-tracker.git
+git clone https://github.com/jplande/habit-tracker.git
 cd habit-tracker
 ```
 
